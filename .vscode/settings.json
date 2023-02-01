@@ -1,5 +1,10 @@
 {
-    "files.insertFinalNewline": true,
-    "editor.formatOnSave": true,
-    "files.trimTrailingWhitespace": true
+    // "files.insertFinalNewline": true,
+    // "editor.formatOnSave": true,
+    // "files.trimTrailingWhitespace": true,
+    "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
+    "rust-analyzer.cargo.noDefaultFeatures": true,
+    "rust-analyzer.cargo.features": [
+        "html5_canvas_2d"
+    ]
 }
