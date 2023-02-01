@@ -23,13 +23,13 @@ struct PaintHandle {
     paint_type: PaintType,
 }
 
-pub struct Painter {
+pub struct SkiaPainter {
     paints: AHashMap<TextureId, PaintHandle>,
     white_paint_workaround: Paint,
 }
 
-impl Painter {
-    pub fn new() -> Painter {
+impl SkiaPainter {
+    pub fn new() -> SkiaPainter {
         let mut white_paint_workaround = Paint::default();
         white_paint_workaround.set_color(Color::WHITE);
 
@@ -37,6 +37,10 @@ impl Painter {
             paints: AHashMap::new(),
             white_paint_workaround,
         }
+    }
+
+    pub fn max_texture_side(&self) -> usize {
+        todo!()
     }
 
     pub fn paint_and_update_textures(
