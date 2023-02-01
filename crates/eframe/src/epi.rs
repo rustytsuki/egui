@@ -564,6 +564,12 @@ pub enum Renderer {
     /// Use [`egui_wgpu`] renderer for [`wgpu`](https://github.com/gfx-rs/wgpu).
     #[cfg(feature = "wgpu")]
     Wgpu,
+
+    #[cfg(feature = "skia")]
+    Skia,
+
+    #[cfg(feature = "html5_canvas_2d")]
+    Html5Canvas2D,
 }
 
 impl Default for Renderer {
@@ -572,12 +578,28 @@ impl Default for Renderer {
         return Self::Glow;
 
         #[cfg(not(feature = "glow"))]
+        #[cfg(not(feature = "skia"))]
+        #[cfg(not(feature = "html5_canvas_2d"))]
         #[cfg(feature = "wgpu")]
         return Self::Wgpu;
 
         #[cfg(not(feature = "glow"))]
         #[cfg(not(feature = "wgpu"))]
-        compile_error!("eframe: you must enable at least one of the rendering backend features: 'glow' or 'wgpu'");
+        #[cfg(not(feature = "html5_canvas_2d"))]
+        #[cfg(feature = "skia")]
+        return Self::Skia;
+
+        #[cfg(not(feature = "glow"))]
+        #[cfg(not(feature = "wgpu"))]
+        #[cfg(not(feature = "skia"))]
+        #[cfg(feature = "html5_canvas_2d")]
+        return Self::Html5Canvas2D;
+
+        #[cfg(not(feature = "glow"))]
+        #[cfg(not(feature = "wgpu"))]
+        #[cfg(not(feature = "skia"))]
+        #[cfg(not(feature = "html5_canvas_2d"))]
+        compile_error!("eframe: you must enable at least one of the rendering backend features: 'glow', 'wgpu', 'skia' or 'html5_canvas_2d'");
     }
 }
 
@@ -589,6 +611,12 @@ impl std::fmt::Display for Renderer {
 
             #[cfg(feature = "wgpu")]
             Self::Wgpu => "wgpu".fmt(f),
+
+            #[cfg(feature = "skia")]
+            Self::Skia => "skia".fmt(f),
+
+            #[cfg(feature = "html5_canvas_2d")]
+            Self::Html5Canvas2D => "html5_canvas_2d".fmt(f),
         }
     }
 }
@@ -603,6 +631,12 @@ impl std::str::FromStr for Renderer {
 
             #[cfg(feature = "wgpu")]
             "wgpu" => Ok(Self::Wgpu),
+
+            #[cfg(feature = "skia")]
+            "skia" => Ok(Self::Skia),
+
+            #[cfg(feature = "html5_canvas_2d")]
+            "html5_canvas_2d" => Ok(Self::Html5Canvas2D),
 
             _ => Err(format!("eframe renderer {name:?} is not available. Make sure that the corresponding eframe feature is enabled."))
         }

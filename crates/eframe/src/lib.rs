@@ -69,6 +69,9 @@ pub use {egui_glow, glow};
 #[cfg(feature = "wgpu")]
 pub use {egui_wgpu, wgpu};
 
+#[cfg(feature = "skia")]
+pub use skia_safe;
+
 mod epi;
 
 // Re-export everything in `epi` so `eframe` users don't have to care about what `epi` is:
@@ -196,6 +199,12 @@ pub fn run_native(app_name: &str, native_options: NativeOptions, app_creator: Ap
         Renderer::Wgpu => {
             tracing::debug!("Using the wgpu renderer");
             native::run::run_wgpu(app_name, native_options, app_creator);
+        }
+
+        #[cfg(feature = "skia")]
+        Renderer::Skia => {
+            tracing::debug!("Using the skia renderer");
+            native::run::run_skia(app_name, native_options, app_creator);
         }
     }
 }

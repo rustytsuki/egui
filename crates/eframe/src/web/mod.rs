@@ -9,8 +9,8 @@ pub mod screen_reader;
 pub mod storage;
 mod text_agent;
 
-#[cfg(not(any(feature = "glow", feature = "wgpu")))]
-compile_error!("You must enable either the 'glow' or 'wgpu' feature");
+#[cfg(not(any(feature = "glow", feature = "wgpu", feature = "html5_canvas_2d")))]
+compile_error!("You must enable either the 'glow', 'wgpu' or 'html5_canvas_2d' feature");
 
 mod web_painter;
 
@@ -23,6 +23,11 @@ pub(crate) type ActiveWebPainter = web_painter_glow::WebPainterGlow;
 mod web_painter_wgpu;
 #[cfg(all(feature = "wgpu", not(feature = "glow")))]
 pub(crate) type ActiveWebPainter = web_painter_wgpu::WebPainterWgpu;
+
+#[cfg(feature = "html5_canvas_2d")]
+mod web_painter_canvas2d;
+#[cfg(feature = "html5_canvas_2d")]
+pub(crate) type ActiveWebPainter = web_painter_canvas2d::WebPainterCanvas2D;
 
 pub use backend::*;
 pub use events::*;
