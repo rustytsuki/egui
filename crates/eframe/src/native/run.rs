@@ -424,7 +424,7 @@ mod glow_integration {
         pub fn window(&self) -> &winit::window::Window {
             &self.window
         }
-        fn resize(&self, physical_size: winit::dpi::PhysicalSize<u32>) {
+        pub fn resize(&self, physical_size: winit::dpi::PhysicalSize<u32>) {
             use glutin::surface::GlSurface;
             self.gl_surface.resize(
                 &self.gl_context,
@@ -438,7 +438,7 @@ mod glow_integration {
                     .expect("physical size must not be zero"),
             );
         }
-        fn swap_buffers(&self) -> glutin::error::Result<()> {
+        pub fn swap_buffers(&self) -> glutin::error::Result<()> {
             use glutin::surface::GlSurface;
             self.gl_surface.swap_buffers(&self.gl_context)
         }

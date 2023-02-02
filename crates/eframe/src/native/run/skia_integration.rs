@@ -68,7 +68,7 @@ impl SkiaWinitApp {
             &self.native_options,
         );
 
-        let painter = SkiaPainter::new();
+        let painter = SkiaPainter::new(skia_window.surface());
 
         let system_theme = self.native_options.system_theme();
         let mut integration = epi_integration::EpiIntegration::new(
@@ -183,7 +183,7 @@ impl WinitApp for SkiaWinitApp {
             painter.paint_and_update_textures(
                 screen_size_in_pixels,
                 integration.egui_ctx.pixels_per_point(),
-                &clipped_primitives,
+                clipped_primitives,
                 &textures_delta,
             );
 
@@ -191,7 +191,7 @@ impl WinitApp for SkiaWinitApp {
 
             {
                 crate::profile_scope!("swap_buffers");
-                skia_window.swap_buffers();
+                skia_window.swap_buffers().unwrap();
             }
 
             integration.post_present(window);

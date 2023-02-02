@@ -1,5 +1,4 @@
-use glutin::surface::GlSurface;
-use skia_safe::{Surface, gpu::{gl::FramebufferInfo, BackendRenderTarget, SurfaceOrigin}, ColorType};
+use skia_safe::{Surface, gpu::{gl::FramebufferInfo, BackendRenderTarget, SurfaceOrigin}, ColorType, Canvas, Paint, PaintStyle, PaintCap, Path};
 
 use super::{*, skia_painter::SkiaPainter, glow_integration::GlutinWindowContext};
 
@@ -23,7 +22,7 @@ impl SkiaWindowContext {
             gl_window.get_proc_address(&s)
         });
 
-        let surface = create_surface(gl_window.window()).unwrap();
+        let mut surface = create_surface(gl_window.window()).unwrap();
 
         Self {
             gl_window,
@@ -35,12 +34,18 @@ impl SkiaWindowContext {
         &self.gl_window.window()
     }
 
-    pub fn resize(&self, physical_size: winit::dpi::PhysicalSize<u32>) {
-        // todo!()
+    pub fn surface(&self) -> Surface {
+        self.surface.clone()
     }
 
-    pub fn swap_buffers(&self) {
-        // todo!()
+    pub fn resize(&self, physical_size: winit::dpi::PhysicalSize<u32>) {
+        self.gl_window.resize(physical_size);
+    }
+
+    pub fn swap_buffers(&self) -> glutin::error::Result<()> {
+        let mut surface = self.surface.clone();
+        surface.flush();
+        self.gl_window.swap_buffers()
     }
 }
 
