@@ -19,7 +19,12 @@ impl SkiaWindowContext {
     pub fn window(&self) -> &winit::window::Window {
         &self.window
     }
-    fn resize(&self, physical_size: winit::dpi::PhysicalSize<u32>) {
+
+    pub fn resize(&self, physical_size: winit::dpi::PhysicalSize<u32>) {
+        todo!()
+    }
+
+    pub fn swap_buffers(&self) {
         todo!()
     }
 }
