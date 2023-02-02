@@ -275,7 +275,7 @@ fn center_window_pos(
 
 // ----------------------------------------------------------------------------
 /// Run an egui app
-#[cfg(feature = "glow")]
+#[cfg(any(feature = "glow", feature = "skia"))]
 mod glow_integration {
     use std::sync::Arc;
 
@@ -297,6 +297,7 @@ mod glow_integration {
     /// State that is initialized when the application is first starts running via
     /// a Resumed event. On Android this ensures that any graphics state is only
     /// initialized once the application has an associated `SurfaceView`.
+    #[cfg(feature = "glow")]
     struct GlowWinitRunning {
         gl: Arc<glow::Context>,
         painter: egui_glow::Painter,
@@ -307,7 +308,7 @@ mod glow_integration {
         // can be persistent.
         gl_window: GlutinWindowContext,
     }
-    struct GlutinWindowContext {
+    pub struct GlutinWindowContext {
         window: winit::window::Window,
         gl_context: glutin::context::PossiblyCurrentContext,
         gl_display: glutin::display::Display,
@@ -318,7 +319,7 @@ mod glow_integration {
         // refactor this function to use `glutin-winit` crate eventually.
         // preferably add android support at the same time.
         #[allow(unsafe_code)]
-        unsafe fn new(
+        pub unsafe fn new(
             winit_window: winit::window::Window,
             native_options: &epi::NativeOptions,
         ) -> Self {
@@ -420,7 +421,7 @@ mod glow_integration {
                 gl_surface,
             }
         }
-        fn window(&self) -> &winit::window::Window {
+        pub fn window(&self) -> &winit::window::Window {
             &self.window
         }
         fn resize(&self, physical_size: winit::dpi::PhysicalSize<u32>) {
@@ -441,12 +442,13 @@ mod glow_integration {
             use glutin::surface::GlSurface;
             self.gl_surface.swap_buffers(&self.gl_context)
         }
-        fn get_proc_address(&self, addr: &std::ffi::CStr) -> *const std::ffi::c_void {
+        pub fn get_proc_address(&self, addr: &std::ffi::CStr) -> *const std::ffi::c_void {
             use glutin::display::GlDisplay;
             self.gl_display.get_proc_address(addr)
         }
     }
 
+    #[cfg(feature = "glow")]
     struct GlowWinitApp {
         repaint_proxy: Arc<egui::mutex::Mutex<EventLoopProxy<UserEvent>>>,
         app_name: String,
@@ -462,6 +464,7 @@ mod glow_integration {
         frame_nr: u64,
     }
 
+    #[cfg(feature = "glow")]
     impl GlowWinitApp {
         fn new(
             event_loop: &EventLoop<UserEvent>,
@@ -588,6 +591,7 @@ mod glow_integration {
         }
     }
 
+    #[cfg(feature = "glow")]
     impl WinitApp for GlowWinitApp {
         fn is_focused(&self) -> bool {
             self.is_focused
@@ -836,6 +840,7 @@ mod glow_integration {
         }
     }
 
+    #[cfg(feature = "glow")]
     pub fn run_glow(
         app_name: &str,
         mut native_options: epi::NativeOptions,

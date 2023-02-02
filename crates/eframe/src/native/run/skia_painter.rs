@@ -26,6 +26,7 @@ struct PaintHandle {
 pub struct SkiaPainter {
     paints: AHashMap<TextureId, PaintHandle>,
     white_paint_workaround: Paint,
+    max_texture_side: usize,
 }
 
 impl SkiaPainter {
@@ -36,11 +37,16 @@ impl SkiaPainter {
         Self {
             paints: AHashMap::new(),
             white_paint_workaround,
+            max_texture_side: 8 * 1024,
         }
     }
 
+    pub fn set_max_texture_side(&mut self, max_texture_side: usize) {
+        self.max_texture_side = max_texture_side;
+    }
+
     pub fn max_texture_side(&self) -> usize {
-        todo!()
+        self.max_texture_side
     }
 
     pub fn paint_and_update_textures(
@@ -50,7 +56,6 @@ impl SkiaPainter {
         clipped_primitives: &[egui::ClippedPrimitive],
         textures_delta: &egui::TexturesDelta,
     ) {
-        todo!()
 
         // textures_delta.set.iter().for_each(|(id, image_delta)| {
         //     let delta_image = match &image_delta.image {
@@ -346,12 +351,12 @@ impl SkiaPainter {
     }
 
     pub fn destroy(&mut self) {
-        todo!()
+        // todo!()
     }
 }
 
 pub fn clear(screen_size_in_pixels: [u32; 2], clear_color: egui::Rgba) {
-    todo!()
+    // todo!()
 }
 
 pub struct EguiSkiaPaintCallback {
