@@ -354,12 +354,8 @@ impl SkiaPainter {
     }
 
     pub fn destroy(&mut self) {
-        // todo!()
+        println!("destroy to do!");
     }
-}
-
-pub fn clear(screen_size_in_pixels: [u32; 2], clear_color: egui::Rgba) {
-    // todo!()
 }
 
 pub struct EguiSkiaPaintCallback {

@@ -161,7 +161,7 @@ impl WinitApp for SkiaWinitApp {
 
             let screen_size_in_pixels: [u32; 2] = window.inner_size().into();
 
-            skia_painter::clear(
+            skia_window.clear(
                 screen_size_in_pixels,
                 app.clear_color(&integration.egui_ctx.style().visuals),
             );

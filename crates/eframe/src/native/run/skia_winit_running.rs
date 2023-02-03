@@ -1,4 +1,4 @@
-use skia_safe::{Surface, gpu::{gl::FramebufferInfo, BackendRenderTarget, SurfaceOrigin}, ColorType, Canvas, Paint, PaintStyle, PaintCap, Path};
+use skia_safe::{Surface, gpu::{gl::FramebufferInfo, BackendRenderTarget, SurfaceOrigin}, ColorType, Color4f};
 
 use super::{*, skia_painter::SkiaPainter, glow_integration::GlutinWindowContext};
 
@@ -40,6 +40,11 @@ impl SkiaWindowContext {
 
     pub fn resize(&self, physical_size: winit::dpi::PhysicalSize<u32>) {
         self.gl_window.resize(physical_size);
+    }
+
+    pub fn clear(&self, screen_size_in_pixels: [u32; 2], clear_color: egui::Rgba) {
+        let mut surface = self.surface.clone();
+        surface.canvas().clear(Color4f::new(clear_color[0], clear_color[1], clear_color[2], clear_color[3]));
     }
 
     pub fn swap_buffers(&self) -> glutin::error::Result<()> {
