@@ -4,6 +4,7 @@ use winit::window::Window;
 use crate::epi;
 
 pub struct SkiaGlutinWindowContext {
+    pub surface: Surface,   // surface must be ahead of gl_context, for the order of destroying
     gl_context: glutin::context::PossiblyCurrentContext,
     gl_display: glutin::display::Display,
     gl_surface: glutin::surface::Surface<glutin::surface::WindowSurface>,
@@ -16,7 +17,8 @@ impl SkiaGlutinWindowContext {
     pub unsafe fn new(
         winit_window: &winit::window::Window,
         native_options: &epi::NativeOptions,
-    ) -> Self {
+    ) -> Option<Self> {
+        // copied from run::glow_integration::GlutinWindowContext
         use glutin::prelude::*;
         use raw_window_handle::*;
         let hardware_acceleration = match native_options.hardware_acceleration {
@@ -108,11 +110,21 @@ impl SkiaGlutinWindowContext {
         gl_surface
             .set_swap_interval(&gl_context, swap_interval)
             .expect("failed to set vsync swap interval");
-        SkiaGlutinWindowContext {
+
+        // create skia gl surface
+        gl_rs::load_with(|s| {
+            let s = std::ffi::CString::new(s).expect("failed to construct C string from string for gl proc address");
+            gl_display.get_proc_address(&s)
+        });
+
+        let surface = create_surface(winit_window).unwrap();
+
+        Some(SkiaGlutinWindowContext {
+            surface,
             gl_context,
             gl_display,
             gl_surface,
-        }
+        })
     }
     pub fn resize(&self, physical_size: winit::dpi::PhysicalSize<u32>) {
         use glutin::surface::GlSurface;
@@ -128,28 +140,13 @@ impl SkiaGlutinWindowContext {
                 .expect("physical size must not be zero"),
         );
     }
-    pub fn swap_buffers(&self) -> glutin::error::Result<()> {
+
+    pub fn swap_buffers(&mut self) -> glutin::error::Result<()> {
+        self.surface.flush();
+
         use glutin::surface::GlSurface;
         self.gl_surface.swap_buffers(&self.gl_context)
     }
-    pub fn get_proc_address(&self, addr: &std::ffi::CStr) -> *const std::ffi::c_void {
-        use glutin::display::GlDisplay;
-        self.gl_display.get_proc_address(addr)
-    }
-}
-
-pub fn new(winit_window: &Window, native_options: &epi::NativeOptions) -> Option<(SkiaGlutinWindowContext, Surface)> {
-    let gl_window = unsafe { SkiaGlutinWindowContext::new(winit_window, native_options) };
-    gl_rs::load_with(|s| {
-        let s = std::ffi::CString::new(s).expect("failed to construct C string from string for gl proc address");
-        gl_window.get_proc_address(&s)
-    });
-
-    if let Some(surface) = create_surface(winit_window) {
-        return Some((gl_window, surface));
-    }
-
-    None
 }
 
 fn create_surface(window: &Window) -> Option<Surface> {

@@ -28,10 +28,11 @@ pub struct SkiaPainter {
     white_paint_workaround: Paint,
     max_texture_side: usize,
     surface: Surface,
+    is_cpu: bool,
 }
 
 impl SkiaPainter {
-    pub fn new(surface: Surface) -> SkiaPainter {
+    pub fn new(surface: Surface, is_cpu: bool) -> SkiaPainter {
         let mut white_paint_workaround = Paint::default();
         white_paint_workaround.set_color(Color::WHITE);
 
@@ -40,6 +41,7 @@ impl SkiaPainter {
             white_paint_workaround,
             max_texture_side: 8 * 1024,
             surface,
+            is_cpu,
         }
     }
 
@@ -58,7 +60,8 @@ impl SkiaPainter {
         clipped_primitives: Vec<ClippedPrimitive>,
         textures_delta: &egui::TexturesDelta,
     ) {
-        let canvas = self.surface.canvas();
+        let mut surface = self.surface.clone();
+        let canvas = surface.canvas();
 
         textures_delta.set.iter().for_each(|(id, image_delta)| {
             let delta_image = match &image_delta.image {
@@ -133,13 +136,11 @@ impl SkiaPainter {
                 }
             };
 
-            let local_matrix =
-                skia_safe::Matrix::scale((1.0 / image.width() as f32, 1.0 / image.height() as f32));
+            let local_matrix = skia_safe::Matrix::scale((1.0 / image.width() as f32, 1.0 / image.height() as f32));
 
-            #[cfg(feature = "cpu_fix")]
-            let sampling_options = skia_safe::SamplingOptions::new(skia_safe::FilterMode::Nearest, skia_safe::MipmapMode::None);
-            #[cfg(not(feature = "cpu_fix"))]
-            let sampling_options = {
+            let sampling_options = if self.is_cpu {
+                skia_safe::SamplingOptions::new(skia_safe::FilterMode::Nearest, skia_safe::MipmapMode::None)
+            } else {
                 let filter_mode = match image_delta.options.magnification {
                     TextureFilter::Nearest => skia_safe::FilterMode::Nearest,
                     TextureFilter::Linear => skia_safe::FilterMode::Linear,
@@ -189,14 +190,14 @@ impl SkiaPainter {
                     canvas.set_matrix(&skia_safe::M44::new_identity().set_scale(pixels_per_point, pixels_per_point, 1.0));
                     let mut arc = skia_safe::AutoCanvasRestore::guard(canvas, true);
 
-                    #[cfg(feature = "cpu_fix")]
-                    let meshes = mesh
+                    let meshes = if self.is_cpu { mesh
                         .split_to_u16()
                         .into_iter()
                         .flat_map(|mesh| self.split_texture_meshes(mesh))
-                        .collect::<Vec<Mesh16>>();
-                    #[cfg(not(feature = "cpu_fix"))]
-                    let meshes = mesh.split_to_u16();
+                        .collect::<Vec<Mesh16>>()
+                    } else {
+                        mesh.split_to_u16()
+                    };
 
                     for mesh in &meshes {
                         let texture_id = mesh.texture_id;
@@ -262,7 +263,7 @@ impl SkiaPainter {
                         // Here we check if the mesh is a font texture and if it's first uv has 0,0
                         // If yes, we use a white paint instead of the texture shader paint
 
-                        let cpu_fix = if cfg!(feature = "cpu_fix")
+                        let cpu_fix = if self.is_cpu
                             && self.paints.get(&mesh.texture_id).unwrap().paint_type
                                 == PaintType::Font
                         {
@@ -312,7 +313,6 @@ impl SkiaPainter {
     }
 
     // This could be optimized more but works for now
-    #[cfg(feature = "cpu_fix")]
     fn split_texture_meshes(&self, mesh: Mesh16) -> Vec<Mesh16> {
         if self.paints.get(&mesh.texture_id).unwrap().paint_type != PaintType::Font {
             return vec![mesh];
@@ -329,7 +329,7 @@ impl SkiaPainter {
 
         for index in mesh.indices.iter() {
             let vertex = mesh.vertices.get(*index as usize).unwrap();
-            let is_current_zero = (vertex.uv.x == 0.0 && vertex.uv.y == 0.0);
+            let is_current_zero = vertex.uv.x == 0.0 && vertex.uv.y == 0.0;
             if is_current_zero != is_zero.unwrap_or(is_current_zero) {
                 meshes.push(Mesh16 {
                     indices: vec![],

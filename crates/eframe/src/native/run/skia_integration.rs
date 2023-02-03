@@ -68,7 +68,7 @@ impl SkiaWinitApp {
             &self.native_options,
         );
 
-        let painter = SkiaPainter::new(skia_window.surface());
+        let painter = SkiaPainter::new(skia_window.surface(), skia_window.is_cpu());
 
         let system_theme = self.native_options.system_theme();
         let mut integration = epi_integration::EpiIntegration::new(
@@ -157,9 +157,7 @@ impl WinitApp for SkiaWinitApp {
                 skia_window,
             } = running;
 
-            let window = skia_window.window();
-
-            let screen_size_in_pixels: [u32; 2] = window.inner_size().into();
+            let screen_size_in_pixels: [u32; 2] = skia_window.window().inner_size().into();
 
             skia_window.clear(
                 screen_size_in_pixels,
@@ -171,9 +169,9 @@ impl WinitApp for SkiaWinitApp {
                 repaint_after,
                 textures_delta,
                 shapes,
-            } = integration.update(app.as_mut(), window);
+            } = integration.update(app.as_mut(), skia_window.window());
 
-            integration.handle_platform_output(window, platform_output);
+            integration.handle_platform_output(skia_window.window(), platform_output);
 
             let clipped_primitives = {
                 crate::profile_scope!("tessellate");
@@ -187,14 +185,14 @@ impl WinitApp for SkiaWinitApp {
                 &textures_delta,
             );
 
-            integration.post_rendering(app.as_mut(), window);
+            integration.post_rendering(app.as_mut(), skia_window.window());
 
             {
                 crate::profile_scope!("swap_buffers");
                 skia_window.swap_buffers();
             }
 
-            integration.post_present(window);
+            integration.post_present(skia_window.window());
 
             #[cfg(feature = "__screenshot")]
             // give it time to settle:
@@ -233,7 +231,7 @@ impl WinitApp for SkiaWinitApp {
                 EventResult::Wait
             };
 
-            integration.maybe_autosave(app.as_mut(), window);
+            integration.maybe_autosave(app.as_mut(), skia_window.window());
 
             if !self.is_focused {
                 // On Mac, a minimized Window uses up all CPU: https://github.com/emilk/egui/issues/325
