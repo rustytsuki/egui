@@ -275,7 +275,7 @@ fn center_window_pos(
 
 // ----------------------------------------------------------------------------
 /// Run an egui app
-#[cfg(any(feature = "glow", feature = "skia"))]
+#[cfg(feature = "glow")]
 mod glow_integration {
     use std::sync::Arc;
 
@@ -297,7 +297,6 @@ mod glow_integration {
     /// State that is initialized when the application is first starts running via
     /// a Resumed event. On Android this ensures that any graphics state is only
     /// initialized once the application has an associated `SurfaceView`.
-    #[cfg(feature = "glow")]
     struct GlowWinitRunning {
         gl: Arc<glow::Context>,
         painter: egui_glow::Painter,
@@ -448,7 +447,6 @@ mod glow_integration {
         }
     }
 
-    #[cfg(feature = "glow")]
     struct GlowWinitApp {
         repaint_proxy: Arc<egui::mutex::Mutex<EventLoopProxy<UserEvent>>>,
         app_name: String,
@@ -464,7 +462,6 @@ mod glow_integration {
         frame_nr: u64,
     }
 
-    #[cfg(feature = "glow")]
     impl GlowWinitApp {
         fn new(
             event_loop: &EventLoop<UserEvent>,
@@ -591,7 +588,6 @@ mod glow_integration {
         }
     }
 
-    #[cfg(feature = "glow")]
     impl WinitApp for GlowWinitApp {
         fn is_focused(&self) -> bool {
             self.is_focused
@@ -840,7 +836,6 @@ mod glow_integration {
         }
     }
 
-    #[cfg(feature = "glow")]
     pub fn run_glow(
         app_name: &str,
         mut native_options: epi::NativeOptions,
@@ -1299,6 +1294,10 @@ mod skia_integration;
 mod skia_painter;
 #[cfg(feature = "skia")]
 mod skia_winit_running;
+#[cfg(feature = "skia")]
+mod skia_gl_context;
+#[cfg(feature = "skia")]
+mod skia_cpu_context;
 // ----------------------------------------------------------------------------
 #[cfg(feature = "skia")]
 pub use skia_integration::run_skia;

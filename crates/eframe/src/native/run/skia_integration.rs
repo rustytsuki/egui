@@ -191,7 +191,7 @@ impl WinitApp for SkiaWinitApp {
 
             {
                 crate::profile_scope!("swap_buffers");
-                skia_window.swap_buffers().unwrap();
+                skia_window.swap_buffers();
             }
 
             integration.post_present(window);
