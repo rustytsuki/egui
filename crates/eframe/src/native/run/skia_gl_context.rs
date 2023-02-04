@@ -126,7 +126,7 @@ impl SkiaGlutinWindowContext {
             gl_surface,
         })
     }
-    pub fn resize(&self, physical_size: winit::dpi::PhysicalSize<u32>) {
+    pub fn resize(&mut self, physical_size: winit::dpi::PhysicalSize<u32>) {
         use glutin::surface::GlSurface;
         self.gl_surface.resize(
             &self.gl_context,

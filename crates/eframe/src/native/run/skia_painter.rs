@@ -27,12 +27,11 @@ pub struct SkiaPainter {
     paints: AHashMap<TextureId, PaintHandle>,
     white_paint_workaround: Paint,
     max_texture_side: usize,
-    surface: Surface,
     is_cpu: bool,
 }
 
 impl SkiaPainter {
-    pub fn new(surface: Surface, is_cpu: bool) -> SkiaPainter {
+    pub fn new(is_cpu: bool) -> SkiaPainter {
         let mut white_paint_workaround = Paint::default();
         white_paint_workaround.set_color(Color::WHITE);
 
@@ -40,7 +39,6 @@ impl SkiaPainter {
             paints: AHashMap::new(),
             white_paint_workaround,
             max_texture_side: 8 * 1024,
-            surface,
             is_cpu,
         }
     }
@@ -55,14 +53,12 @@ impl SkiaPainter {
 
     pub fn paint_and_update_textures(
         &mut self,
+        canvas: &mut Canvas,
         screen_size_px: [u32; 2],
         pixels_per_point: f32,
         clipped_primitives: Vec<ClippedPrimitive>,
         textures_delta: &egui::TexturesDelta,
     ) {
-        let mut surface = self.surface.clone();
-        let canvas = surface.canvas();
-
         textures_delta.set.iter().for_each(|(id, image_delta)| {
             let delta_image = match &image_delta.image {
                 ImageData::Color(color_image) => Image::from_raster_data(

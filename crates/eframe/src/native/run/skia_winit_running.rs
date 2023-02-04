@@ -1,4 +1,4 @@
-use skia_safe::{Surface, Color4f};
+use skia_safe::{Surface, Color4f, ConditionallySend, Canvas};
 use winit::{window::Window, dpi::PhysicalSize};
 use super::{*, skia_painter::SkiaPainter, skia_gl_context::SkiaGlutinWindowContext, skia_cpu_context::SkiaCPUWindowContext};
 
@@ -45,25 +45,24 @@ impl SkiaWindowContext {
         &self.window
     }
 
-    pub fn surface(&self) -> Surface {
-        if let Some(gl_context) = &self.gl_context {
-            gl_context.surface.clone()
+    pub fn canvas(&mut self) -> &mut Canvas {
+        if let Some(gl_context) = &mut self.gl_context {
+            gl_context.surface.canvas()
         } else {
-            self.cpu_context.as_ref().unwrap().surface.clone()
+            self.cpu_context.as_mut().unwrap().surface.canvas()
         }
     }
 
-    pub fn resize(&self, physical_size: winit::dpi::PhysicalSize<u32>) {
-        if let Some(gl_context) = &self.gl_context {
+    pub fn resize(&mut self, physical_size: winit::dpi::PhysicalSize<u32>) {
+        if let Some(gl_context) = &mut self.gl_context {
             gl_context.resize(physical_size);
         } else {
-            self.cpu_context.as_ref().unwrap().resize(physical_size);
+            self.cpu_context.as_mut().unwrap().resize(physical_size);
         }
     }
 
-    pub fn clear(&self, screen_size_in_pixels: [u32; 2], clear_color: egui::Rgba) {
-        let mut surface = self.surface();
-        surface.canvas().clear(Color4f::new(clear_color[0], clear_color[1], clear_color[2], clear_color[3]));
+    pub fn clear(&mut self, screen_size_in_pixels: [u32; 2], clear_color: egui::Rgba) {
+        self.canvas().clear(Color4f::new(clear_color[0], clear_color[1], clear_color[2], clear_color[3]));
     }
 
     pub fn swap_buffers(&mut self) {

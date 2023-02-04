@@ -13,17 +13,21 @@ pub struct SkiaCPUWindowContext {
 impl SkiaCPUWindowContext {
     pub fn new(winit_window: &Window, native_options: &epi::NativeOptions) -> Self {
         let graphics_context = unsafe { GraphicsContext::new(&winit_window, &winit_window) }.unwrap();
-        let (width, height): (i32, i32) = winit_window.inner_size().into();
-        let corlor_type = if cfg!(target_os = "macos") { ColorType::BGRA8888 } else { ColorType::RGBA8888 };
-        let image_info = ImageInfo::new((width, height), corlor_type, AlphaType::Premul, None);
-        let surface = Surface::new_raster(&image_info, None, None).unwrap();
+        let surface = Self::create_surface(winit_window.inner_size());
         Self {
             surface,
             graphics_context,
         }
     }
 
-    pub fn resize(&self, physical_size: winit::dpi::PhysicalSize<u32>) {
+    pub fn create_surface(physical_size: winit::dpi::PhysicalSize<u32>) -> Surface {
+        let corlor_type = if cfg!(target_os = "macos") { ColorType::BGRA8888 } else { ColorType::RGBA8888 };
+        let image_info = ImageInfo::new((physical_size.width as i32, physical_size.height as i32), corlor_type, AlphaType::Premul, None);
+        Surface::new_raster(&image_info, None, None).unwrap()
+    }
+
+    pub fn resize(&mut self, physical_size: winit::dpi::PhysicalSize<u32>) {
+        self.surface = Self::create_surface(physical_size);
     }
 
     pub fn swap_buffers(&mut self) {
