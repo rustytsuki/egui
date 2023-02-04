@@ -13,21 +13,21 @@ pub struct SkiaCPUWindowContext {
 impl SkiaCPUWindowContext {
     pub fn new(winit_window: &Window, native_options: &epi::NativeOptions) -> Self {
         let graphics_context = unsafe { GraphicsContext::new(&winit_window, &winit_window) }.unwrap();
-        let surface = Self::create_surface(winit_window.inner_size());
+        let surface = Self::create_surface(winit_window.inner_size()).unwrap();
         Self {
             surface,
             graphics_context,
         }
     }
 
-    pub fn create_surface(physical_size: winit::dpi::PhysicalSize<u32>) -> Surface {
+    pub fn create_surface(physical_size: winit::dpi::PhysicalSize<u32>) -> Option<Surface> {
         let corlor_type = if cfg!(target_os = "macos") { ColorType::BGRA8888 } else { ColorType::RGBA8888 };
         let image_info = ImageInfo::new((physical_size.width as i32, physical_size.height as i32), corlor_type, AlphaType::Premul, None);
-        Surface::new_raster(&image_info, None, None).unwrap()
+        Surface::new_raster(&image_info, None, None)
     }
 
     pub fn resize(&mut self, physical_size: winit::dpi::PhysicalSize<u32>) {
-        self.surface = Self::create_surface(physical_size);
+        self.surface = Self::create_surface(physical_size).unwrap();
     }
 
     pub fn swap_buffers(&mut self) {

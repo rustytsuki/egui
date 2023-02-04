@@ -2,7 +2,7 @@ use skia_safe::{Surface, Color4f, ConditionallySend, Canvas};
 use winit::{window::Window, dpi::PhysicalSize};
 use super::{*, skia_painter::SkiaPainter, skia_gl_context::SkiaGlutinWindowContext, skia_cpu_context::SkiaCPUWindowContext};
 
-pub static FORCE_CPU: bool = true;
+pub static FORCE_CPU: bool = false;
 
 pub struct SkiaWinitRunning {
     pub painter: SkiaPainter,

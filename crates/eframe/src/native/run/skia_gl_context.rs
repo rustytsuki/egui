@@ -117,7 +117,7 @@ impl SkiaGlutinWindowContext {
             gl_display.get_proc_address(&s)
         });
 
-        let surface = create_surface(winit_window).unwrap();
+        let surface = Self::create_surface(winit_window.inner_size()).unwrap();
 
         Some(SkiaGlutinWindowContext {
             surface,
@@ -125,6 +125,38 @@ impl SkiaGlutinWindowContext {
             gl_display,
             gl_surface,
         })
+    }
+    fn create_surface(physical_size: winit::dpi::PhysicalSize<u32>) -> Option<Surface> {
+        if let Some(mut gr_context) = skia_safe::gpu::DirectContext::new_gl(None, None) {
+            let fb_info = {
+                let mut fboid: gl_rs::types::GLint = 0;
+                unsafe { gl_rs::GetIntegerv(gl_rs::FRAMEBUFFER_BINDING, &mut fboid) };
+                
+                let mut max_texture_side = 0;
+                unsafe { gl_rs::GetIntegerv(gl_rs::MAX_TEXTURE_SIZE, &mut max_texture_side); }
+    
+                FramebufferInfo {
+                    fboid: fboid.try_into().unwrap(),
+                    format: skia_safe::gpu::gl::Format::RGBA8.into(),
+                }
+            };
+    
+            let stencil_bits = 8;
+            let (width, height): (i32, i32) = physical_size.into();
+            let backend_render_target = BackendRenderTarget::new_gl((width, height), None, stencil_bits, fb_info);
+            if let Some(surface) = Surface::from_backend_render_target(
+                &mut gr_context,
+                &backend_render_target,
+                SurfaceOrigin::BottomLeft,
+                ColorType::RGBA8888,
+                None,
+                None,
+            ) {
+                return Some(surface);
+            }
+        }
+    
+        None
     }
     pub fn resize(&mut self, physical_size: winit::dpi::PhysicalSize<u32>) {
         use glutin::surface::GlSurface;
@@ -139,6 +171,8 @@ impl SkiaGlutinWindowContext {
                 .try_into()
                 .expect("physical size must not be zero"),
         );
+
+        self.surface = Self::create_surface(physical_size).unwrap();
     }
 
     pub fn swap_buffers(&mut self) -> glutin::error::Result<()> {
@@ -147,37 +181,4 @@ impl SkiaGlutinWindowContext {
         use glutin::surface::GlSurface;
         self.gl_surface.swap_buffers(&self.gl_context)
     }
-}
-
-fn create_surface(window: &Window) -> Option<Surface> {
-    if let Some(mut gr_context) = skia_safe::gpu::DirectContext::new_gl(None, None) {
-        let fb_info = {
-            let mut fboid: gl_rs::types::GLint = 0;
-            unsafe { gl_rs::GetIntegerv(gl_rs::FRAMEBUFFER_BINDING, &mut fboid) };
-            
-            let mut max_texture_side = 0;
-            unsafe { gl_rs::GetIntegerv(gl_rs::MAX_TEXTURE_SIZE, &mut max_texture_side); }
-
-            FramebufferInfo {
-                fboid: fboid.try_into().unwrap(),
-                format: skia_safe::gpu::gl::Format::RGBA8.into(),
-            }
-        };
-
-        let stencil_bits = 8;
-        let (width, height): (i32, i32) = window.inner_size().into();
-        let backend_render_target = BackendRenderTarget::new_gl((width, height), None, stencil_bits, fb_info);
-        if let Some(surface) = Surface::from_backend_render_target(
-            &mut gr_context,
-            &backend_render_target,
-            SurfaceOrigin::BottomLeft,
-            ColorType::RGBA8888,
-            None,
-            None,
-        ) {
-            return Some(surface);
-        }
-    }
-
-    None
 }
