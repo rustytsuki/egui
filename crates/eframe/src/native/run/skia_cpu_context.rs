@@ -21,8 +21,7 @@ impl SkiaCPUWindowContext {
     }
 
     pub fn create_surface(physical_size: winit::dpi::PhysicalSize<u32>) -> Option<Surface> {
-        let corlor_type = if cfg!(target_os = "macos") { ColorType::BGRA8888 } else { ColorType::RGBA8888 };
-        let image_info = ImageInfo::new((physical_size.width as i32, physical_size.height as i32), corlor_type, AlphaType::Premul, None);
+        let image_info = ImageInfo::new((physical_size.width as i32, physical_size.height as i32), ColorType::BGRA8888, AlphaType::Premul, None);
         Surface::new_raster(&image_info, None, None)
     }
 
