@@ -1,10 +1,12 @@
-use skia_safe::{Surface, gpu::{gl::FramebufferInfo, BackendRenderTarget, SurfaceOrigin}, ColorType, Color4f};
-use winit::window::Window;
+use skia_safe::{
+    gpu::{gl::FramebufferInfo, BackendRenderTarget, SurfaceOrigin},
+    ColorType, Surface,
+};
 
 use crate::epi;
 
 pub struct SkiaGlutinWindowContext {
-    pub surface: Surface,   // surface must be ahead of gl_context, for the order of destroying
+    pub surface: Surface, // surface must be ahead of gl_context, for the order of destroying
     gl_context: glutin::context::PossiblyCurrentContext,
     gl_display: glutin::display::Display,
     gl_surface: glutin::surface::Surface<glutin::surface::WindowSurface>,
@@ -36,8 +38,7 @@ impl SkiaGlutinWindowContext {
 
         // try egl and fallback to windows wgl. Windows is the only platform that *requires* window handle to create display.
         #[cfg(target_os = "windows")]
-        let preference =
-            glutin::display::DisplayApiPreference::EglThenWgl(Some(raw_window_handle));
+        let preference = glutin::display::DisplayApiPreference::EglThenWgl(Some(raw_window_handle));
         // try egl and fallback to x11 glx
         #[cfg(target_os = "linux")]
         let preference = glutin::display::DisplayApiPreference::EglThenGlx(Box::new(
@@ -48,10 +49,10 @@ impl SkiaGlutinWindowContext {
         #[cfg(target_os = "android")]
         let preference = glutin::display::DisplayApiPreference::Egl;
 
-        let gl_display = glutin::display::Display::new(raw_display_handle, preference)
-            .expect("failed to create glutin display");
+        let gl_display = glutin::display::Display::new(raw_display_handle, preference).ok()?;
+
         let swap_interval = if native_options.vsync {
-            glutin::surface::SwapInterval::Wait(std::num::NonZeroU32::new(1).unwrap())
+            glutin::surface::SwapInterval::Wait(std::num::NonZeroU32::new(1)?)
         } else {
             glutin::surface::SwapInterval::DontWait
         };
@@ -61,12 +62,7 @@ impl SkiaGlutinWindowContext {
             .with_depth_size(native_options.depth_buffer);
         // we don't know if multi sampling option is set. so, check if its more than 0.
         let config_template = if native_options.multisampling > 0 {
-            config_template.with_multisampling(
-                native_options
-                    .multisampling
-                    .try_into()
-                    .expect("failed to fit multisamples into u8"),
-            )
+            config_template.with_multisampling(native_options.multisampling.try_into().ok()?)
         } else {
             config_template
         };
@@ -79,11 +75,7 @@ impl SkiaGlutinWindowContext {
         // this is where we will try to get a "fallback" config if we are okay with ignoring some native
         // options required by user like multi sampling, srgb, transparency etc..
         // TODO: need to figure out a good fallback config template
-        let config = gl_display
-            .find_configs(config_template)
-            .expect("failed to find even a single matching configuration")
-            .next()
-            .expect("failed to find a matching configuration for creating opengl context");
+        let config = gl_display.find_configs(config_template).ok()?.next()?;
 
         let context_attributes =
             glutin::context::ContextAttributesBuilder::new().build(Some(raw_window_handle));
@@ -93,31 +85,23 @@ impl SkiaGlutinWindowContext {
             glutin::surface::SurfaceAttributesBuilder::<glutin::surface::WindowSurface>::new()
                 .build(
                     raw_window_handle,
-                    std::num::NonZeroU32::new(width).unwrap(),
-                    std::num::NonZeroU32::new(height).unwrap(),
+                    std::num::NonZeroU32::new(width)?,
+                    std::num::NonZeroU32::new(height)?,
                 );
         // start creating the gl objects
-        let gl_context = gl_display
-            .create_context(&config, &context_attributes)
-            .expect("failed to create opengl context");
+        let gl_context = gl_display.create_context(&config, &context_attributes).ok()?;
 
-        let gl_surface = gl_display
-            .create_window_surface(&config, &surface_attributes)
-            .expect("failed to create glutin window surface");
-        let gl_context = gl_context
-            .make_current(&gl_surface)
-            .expect("failed to make gl context current");
-        gl_surface
-            .set_swap_interval(&gl_context, swap_interval)
-            .expect("failed to set vsync swap interval");
+        let gl_surface = gl_display.create_window_surface(&config, &surface_attributes).ok()?;
+        let gl_context = gl_context.make_current(&gl_surface).ok()?;
+        gl_surface.set_swap_interval(&gl_context, swap_interval).ok()?;
 
         // create skia gl surface
         gl_rs::load_with(|s| {
-            let s = std::ffi::CString::new(s).expect("failed to construct C string from string for gl proc address");
+            let s = std::ffi::CString::new(s).unwrap();
             gl_display.get_proc_address(&s)
         });
 
-        let surface = Self::create_surface(winit_window.inner_size()).unwrap();
+        let surface = Self::create_surface(winit_window.inner_size())?;
 
         Some(SkiaGlutinWindowContext {
             surface,
@@ -131,19 +115,22 @@ impl SkiaGlutinWindowContext {
             let fb_info = {
                 let mut fboid: gl_rs::types::GLint = 0;
                 unsafe { gl_rs::GetIntegerv(gl_rs::FRAMEBUFFER_BINDING, &mut fboid) };
-                
+
                 let mut max_texture_side = 0;
-                unsafe { gl_rs::GetIntegerv(gl_rs::MAX_TEXTURE_SIZE, &mut max_texture_side); }
-    
+                unsafe {
+                    gl_rs::GetIntegerv(gl_rs::MAX_TEXTURE_SIZE, &mut max_texture_side);
+                }
+
                 FramebufferInfo {
-                    fboid: fboid.try_into().unwrap(),
+                    fboid: fboid.try_into().ok()?,
                     format: skia_safe::gpu::gl::Format::RGBA8.into(),
                 }
             };
-    
+
             let stencil_bits = 8;
             let (width, height): (i32, i32) = physical_size.into();
-            let backend_render_target = BackendRenderTarget::new_gl((width, height), None, stencil_bits, fb_info);
+            let backend_render_target =
+                BackendRenderTarget::new_gl((width, height), None, stencil_bits, fb_info);
             if let Some(surface) = Surface::from_backend_render_target(
                 &mut gr_context,
                 &backend_render_target,
@@ -155,7 +142,7 @@ impl SkiaGlutinWindowContext {
                 return Some(surface);
             }
         }
-    
+
         None
     }
     pub fn resize(&mut self, physical_size: winit::dpi::PhysicalSize<u32>) {
