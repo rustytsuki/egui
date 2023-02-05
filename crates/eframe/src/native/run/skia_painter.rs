@@ -298,7 +298,7 @@ impl SkiaPainter {
                         rect.max.y * pixels_per_point,
                     );
 
-                    let mut drawable: Drawable = callback.callback.deref()(skia_rect).0.unwrap();
+                    let mut drawable: Drawable = callback.callback.deref()(skia_rect, pixels_per_point).0.unwrap();
 
                     let mut arc = skia_safe::AutoCanvasRestore::guard(canvas, true);
 
@@ -361,16 +361,16 @@ impl SkiaPainter {
 }
 
 pub struct EguiSkiaPaintCallback {
-    callback: Box<dyn Fn(Rect) -> SyncSendableDrawable + Send + Sync>,
+    callback: Box<dyn Fn(Rect, f32) -> SyncSendableDrawable + Send + Sync>,
 }
 
 impl EguiSkiaPaintCallback {
-    pub fn new<F: Fn(&mut Canvas, Rect) + Send + Sync + 'static>(callback: F) -> EguiSkiaPaintCallback {
+    pub fn new<F: Fn(&mut Canvas, Rect, f32) + Send + Sync + 'static>(callback: F) -> EguiSkiaPaintCallback {
         EguiSkiaPaintCallback {
-            callback: Box::new(move |rect| {
+            callback: Box::new(move |physical_rect, pixels_per_point| {
                 let mut pr = PictureRecorder::new();
-                let mut canvas = pr.begin_recording(rect, None);
-                callback(&mut canvas, rect);
+                let mut canvas = pr.begin_recording(physical_rect, None);
+                callback(&mut canvas, physical_rect, pixels_per_point);
                 SyncSendableDrawable(
                     pr.finish_recording_as_drawable()
                         .unwrap()
