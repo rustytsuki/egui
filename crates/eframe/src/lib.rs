@@ -70,7 +70,7 @@ pub use {egui_glow, glow};
 pub use {egui_wgpu, wgpu};
 
 #[cfg(feature = "skia")]
-pub use skia_safe;
+pub use { skia_safe, native::run::skia_painter::EguiSkiaPaintCallback };
 
 mod epi;
 

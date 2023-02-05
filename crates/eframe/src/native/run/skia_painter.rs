@@ -183,8 +183,8 @@ impl SkiaPainter {
             );
             match primitive.primitive {
                 Primitive::Mesh(mesh) => {
-                    canvas.set_matrix(&skia_safe::M44::new_identity().set_scale(pixels_per_point, pixels_per_point, 1.0));
                     let mut arc = skia_safe::AutoCanvasRestore::guard(canvas, true);
+                    arc.set_matrix(&skia_safe::M44::new_identity().set_scale(pixels_per_point, pixels_per_point, 1.0));
 
                     let meshes = if self.is_cpu { mesh
                         .split_to_u16()
@@ -284,6 +284,13 @@ impl SkiaPainter {
                     let callback: Arc<EguiSkiaPaintCallback> = data.callback.downcast().unwrap();
                     let rect = data.rect;
 
+                    let skia_clip_rect = Rect::new(
+                        skclip_rect.left * pixels_per_point,
+                        skclip_rect.top * pixels_per_point,
+                        skclip_rect.right * pixels_per_point,
+                        skclip_rect.bottom * pixels_per_point,
+                    );
+
                     let skia_rect = Rect::new(
                         rect.min.x * pixels_per_point,
                         rect.min.y * pixels_per_point,
@@ -295,8 +302,7 @@ impl SkiaPainter {
 
                     let mut arc = skia_safe::AutoCanvasRestore::guard(canvas, true);
 
-                    arc.clip_rect(skclip_rect, ClipOp::default(), true);
-                    arc.translate((rect.min.x, rect.min.y));
+                    arc.clip_rect(skia_clip_rect, ClipOp::default(), true);
 
                     drawable.draw(&mut arc, None);
                 }
@@ -359,12 +365,12 @@ pub struct EguiSkiaPaintCallback {
 }
 
 impl EguiSkiaPaintCallback {
-    pub fn new<F: Fn(&mut Canvas) + Send + Sync + 'static>(callback: F) -> EguiSkiaPaintCallback {
+    pub fn new<F: Fn(&mut Canvas, Rect) + Send + Sync + 'static>(callback: F) -> EguiSkiaPaintCallback {
         EguiSkiaPaintCallback {
             callback: Box::new(move |rect| {
                 let mut pr = PictureRecorder::new();
                 let mut canvas = pr.begin_recording(rect, None);
-                callback(&mut canvas);
+                callback(&mut canvas, rect);
                 SyncSendableDrawable(
                     pr.finish_recording_as_drawable()
                         .unwrap()

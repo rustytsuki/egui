@@ -1291,7 +1291,7 @@ pub use wgpu_integration::run_wgpu;
 #[cfg(feature = "skia")]
 mod skia_integration;
 #[cfg(feature = "skia")]
-mod skia_painter;
+pub mod skia_painter;
 #[cfg(feature = "skia")]
 mod skia_winit_running;
 #[cfg(feature = "skia")]
