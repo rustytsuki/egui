@@ -206,6 +206,9 @@ pub fn run_native(app_name: &str, native_options: NativeOptions, app_creator: Ap
             tracing::debug!("Using the skia renderer");
             native::run::run_skia(app_name, native_options, app_creator);
         }
+
+        #[cfg(feature = "html5_canvas_2d")]
+        Renderer::Html5Canvas2D => {},
     }
 }
 
