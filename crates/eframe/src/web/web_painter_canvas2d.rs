@@ -1,3 +1,4 @@
+use egui::ImageData;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 use web_sys::CanvasRenderingContext2d;
@@ -8,6 +9,17 @@ use egui::Rgba;
 use crate::WebOptions;
 
 use super::web_painter::WebPainter;
+
+#[derive(Eq, PartialEq)]
+enum PaintType {
+    Image,
+    Font,
+}
+
+struct PaintHandle {
+    image: HtmlCanvasElement,
+    paint_type: PaintType,
+}
 
 pub(crate) struct WebPainterCanvas2D {
     canvas: HtmlCanvasElement,
@@ -52,10 +64,19 @@ impl WebPainter for WebPainterCanvas2D {
         textures_delta: &egui::TexturesDelta,
     ) -> Result<(), JsValue> {
         // refer to: https://stackoverflow.com/questions/4774172/image-manipulation-and-texture-mapping-using-html5-canvas
-        let canvas_ctx = &self.canvas_ctx;
+        let ctx = &self.canvas_ctx;
 
         textures_delta.set.iter().for_each(|(id, image_delta)| {
-            tracing::debug!("textures_delta set");
+            let delta_image = match &image_delta.image {
+                ImageData::Color(color_image) => {
+                    let pixels = color_image.pixels.iter().flat_map(|p| p.to_array()).collect::<Vec<_>>();
+                    web_sys::ImageData::new_with_u8_clamped_array_and_sh(wasm_bindgen::Clamped(&pixels), color_image.width() as u32, color_image.height() as u32).unwrap()
+                }
+                ImageData::Font(font) => {
+                    let pixels = font.srgba_pixels(Some(1.0)).flat_map(|p| p.to_array()).collect::<Vec<_>>();
+                    web_sys::ImageData::new_with_u8_clamped_array_and_sh(wasm_bindgen::Clamped(&pixels), font.width() as u32, font.height() as u32).unwrap()
+                }
+            };
         });
 
         for primitive in clipped_primitives {
@@ -83,7 +104,7 @@ impl WebPainter for WebPainterCanvas2D {
                         let p0 = mesh.vertices[i0 as usize];
                         let p1 = mesh.vertices[i1 as usize];
                         let p2 = mesh.vertices[i2 as usize];
-                        
+
                         let color0 = format!(
                             "#{:02X}{:02X}{:02X}",
                             p0.color.r(),
@@ -122,18 +143,36 @@ impl WebPainter for WebPainterCanvas2D {
                         // web_sys::console::log_1(&format!("color0: {}", color0).into());
                         // web_sys::console::log_1(&format!("color1: {}", color1).into());
                         // web_sys::console::log_1(&format!("color2: {}", color2).into());
-                        canvas_ctx.save();
-                        canvas_ctx.scale(pixels_per_point as f64, pixels_per_point as f64).unwrap();
-                        canvas_ctx.set_stroke_style(&color0.clone().into());
-                        canvas_ctx.set_fill_style(&color0.into());
-                        canvas_ctx.set_line_width(0.);
-                        canvas_ctx.begin_path();
-                        canvas_ctx.move_to(x0, y0);
-                        canvas_ctx.line_to(x1, y1);
-                        canvas_ctx.line_to(x2, y2);
-                        canvas_ctx.close_path();
-                        canvas_ctx.fill();
-                        canvas_ctx.restore();
+                        ctx.save();
+                        ctx.scale(pixels_per_point as f64, pixels_per_point as f64).unwrap();
+                        ctx.set_stroke_style(&color0.clone().into());
+                        ctx.set_fill_style(&color0.into());
+                        ctx.set_line_width(0.);
+                        ctx.begin_path();
+                        ctx.move_to(x0, y0);
+                        ctx.line_to(x1, y1);
+                        ctx.line_to(x2, y2);
+                        ctx.close_path();
+                        ctx.clip();
+
+                        // Compute matrix transform
+                        let delta = u0*v1 + v0*u2 + u1*v2 - v1*u2 - v0*u1 - u0*v2;
+                        let delta_a = x0*v1 + v0*x2 + x1*v2 - v1*x2 - v0*x1 - x0*v2;
+                        let delta_b = u0*x1 + x0*u2 + u1*x2 - x1*u2 - x0*u1 - u0*x2;
+                        let delta_c = u0*v1*x2 + v0*x1*u2 + x0*u1*v2 - x0*v1*u2 - v0*u1*x2 - u0*x1*v2;
+                        let delta_d = y0*v1 + v0*y2 + y1*v2 - v1*y2 - v0*y1 - y0*v2;
+                        let delta_e = u0*y1 + y0*u2 + u1*y2 - y1*u2 - y0*u1 - u0*y2;
+                        let delta_f = u0*v1*y2 + v0*y1*u2 + y0*u1*v2 - y0*v1*u2 - v0*u1*y2 - u0*y1*v2;
+
+                        // Draw the transformed image
+                        ctx.transform(delta_a/delta, delta_d/delta,
+                                    delta_b/delta, delta_e/delta,
+                                    delta_c/delta, delta_f/delta).ok();
+
+                        // fill texture
+                        // ctx.drawImage(texture, 0, 0);
+
+                        ctx.restore();
                     }
                 }
                 egui::epaint::Primitive::Callback(_) => todo!(),
