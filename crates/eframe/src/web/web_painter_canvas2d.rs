@@ -1,4 +1,6 @@
 use egui::ImageData;
+use egui::TextureId;
+use egui::epaint::ahash::AHashMap;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 use web_sys::CanvasRenderingContext2d;
@@ -18,10 +20,12 @@ enum PaintType {
 
 struct PaintHandle {
     image: HtmlCanvasElement,
+    ctx: CanvasRenderingContext2d,
     paint_type: PaintType,
 }
 
 pub(crate) struct WebPainterCanvas2D {
+    paints: AHashMap<TextureId, PaintHandle>,
     canvas: HtmlCanvasElement,
     canvas_ctx: CanvasRenderingContext2d,
     canvas_id: String,
@@ -38,6 +42,7 @@ impl WebPainterCanvas2D {
             .unwrap();
 
         Ok(Self {
+            paints: AHashMap::new(),
             canvas,
             canvas_ctx,
             canvas_id: canvas_id.to_owned(),
@@ -67,14 +72,44 @@ impl WebPainter for WebPainterCanvas2D {
         let ctx = &self.canvas_ctx;
 
         textures_delta.set.iter().for_each(|(id, image_delta)| {
-            let delta_image = match &image_delta.image {
+            let mut is_font = false;
+
+            let image_data = match &image_delta.image {
                 ImageData::Color(color_image) => {
                     let pixels = color_image.pixels.iter().flat_map(|p| p.to_array()).collect::<Vec<_>>();
                     web_sys::ImageData::new_with_u8_clamped_array_and_sh(wasm_bindgen::Clamped(&pixels), color_image.width() as u32, color_image.height() as u32).unwrap()
                 }
                 ImageData::Font(font) => {
+                    is_font = true;
                     let pixels = font.srgba_pixels(Some(1.0)).flat_map(|p| p.to_array()).collect::<Vec<_>>();
                     web_sys::ImageData::new_with_u8_clamped_array_and_sh(wasm_bindgen::Clamped(&pixels), font.width() as u32, font.height() as u32).unwrap()
+                }
+            };
+            let window = web_sys::window().unwrap();
+            let document = window.document().unwrap();
+
+            match image_delta.pos {
+                None => {
+                    let image_canvas: HtmlCanvasElement = document.create_element("canvas").unwrap().dyn_into::<HtmlCanvasElement>().unwrap();
+                    image_canvas.set_width(image_data.width());
+                    image_canvas.set_height(image_data.height());
+                    let image_ctx: CanvasRenderingContext2d = image_canvas.get_context("2d").unwrap().unwrap().dyn_into::<web_sys::CanvasRenderingContext2d>().unwrap();
+                    image_ctx.put_image_data(&image_data, 0., 0.).unwrap();
+                    let paint = PaintHandle {
+                        image: image_canvas,
+                        ctx: image_ctx,
+                        paint_type: if is_font { PaintType::Font } else { PaintType::Image },
+                    };
+                    self.paints.insert(id.clone(), paint);
+                },
+                Some(pos) => {
+                    let paint = self.paints.remove(&id).unwrap();
+                    let dx = pos[0] as f64;
+                    let dy = pos[1] as f64;
+                    let dw = image_data.width() as f64;
+                    let dh = image_data.height() as f64;
+                    paint.ctx.put_image_data_with_dirty_x_and_dirty_y_and_dirty_width_and_dirty_height(&image_data, dx, dy, dx, dy, dw, dh).unwrap();
+                    self.paints.insert(id.clone(), paint);
                 }
             };
         });
@@ -170,7 +205,8 @@ impl WebPainter for WebPainterCanvas2D {
                                     delta_c/delta, delta_f/delta).ok();
 
                         // fill texture
-                        // ctx.drawImage(texture, 0, 0);
+                        let paint = &self.paints[&mesh.texture_id];
+                        ctx.draw_image_with_html_canvas_element(&paint.image, 0., 0.).unwrap();
 
                         ctx.restore();
                     }
