@@ -159,6 +159,13 @@ impl WebPainter for WebPainterCanvas2D {
                             p2.color.b()
                         );
 
+                        let color_average = (
+                            ((p0.color.r() as f32 + p1.color.r() as f32 + p2.color.r() as f32) / 3.) as u8,
+                            ((p0.color.g() as f32 + p1.color.g() as f32 + p2.color.g() as f32) / 3.) as u8,
+                            ((p0.color.b() as f32 + p1.color.b() as f32 + p2.color.b() as f32) / 3.) as u8);
+
+                        let color_hex = format!("#{:02X}{:02X}{:02X}", color_average.0, color_average.1, color_average.2);
+
                         let x0 = p0.pos.x as f64;
                         let x1 = p1.pos.x as f64;
                         let x2 = p2.pos.x as f64;
@@ -166,28 +173,35 @@ impl WebPainter for WebPainterCanvas2D {
                         let y0 = p0.pos.y as f64;
                         let y1 = p1.pos.y as f64;
                         let y2 = p2.pos.y as f64;
+                        
+                        let paint = &self.paints[&mesh.texture_id];
+                        let tex_width = paint.image.width() as f64;
+                        let tex_height = paint.image.height() as f64;
 
-                        let u0 = p0.uv.x as f64;
-                        let u1 = p1.uv.x as f64;
-                        let u2 = p2.uv.x as f64;
+                        let u0 = p0.uv.x as f64 * tex_width;
+                        let u1 = p1.uv.x as f64 * tex_width;
+                        let u2 = p2.uv.x as f64 * tex_width;
 
-                        let v0 = p0.uv.y as f64;
-                        let v1 = p1.uv.y as f64;
-                        let v2 = p2.uv.y as f64;
+                        let v0 = p0.uv.y as f64 * tex_height;
+                        let v1 = p1.uv.y as f64 * tex_height;
+                        let v2 = p2.uv.y as f64 * tex_height;
 
                         // web_sys::console::log_1(&format!("color0: {}", color0).into());
                         // web_sys::console::log_1(&format!("color1: {}", color1).into());
                         // web_sys::console::log_1(&format!("color2: {}", color2).into());
                         ctx.save();
                         ctx.scale(pixels_per_point as f64, pixels_per_point as f64).unwrap();
-                        ctx.set_stroke_style(&color0.clone().into());
-                        ctx.set_fill_style(&color0.into());
+
+                        ctx.set_stroke_style(&color_hex.clone().into());
+                        ctx.set_fill_style(&color_hex.into());
                         ctx.set_line_width(0.);
                         ctx.begin_path();
                         ctx.move_to(x0, y0);
                         ctx.line_to(x1, y1);
                         ctx.line_to(x2, y2);
                         ctx.close_path();
+                        ctx.fill();
+                        // ctx.stroke();
                         ctx.clip();
 
                         // Compute matrix transform
@@ -204,8 +218,11 @@ impl WebPainter for WebPainterCanvas2D {
                                     delta_b/delta, delta_e/delta,
                                     delta_c/delta, delta_f/delta).ok();
 
+                        if paint.paint_type == PaintType::Font {
+                            ctx.set_global_composite_operation("destination-in").unwrap();
+                        }
+
                         // fill texture
-                        let paint = &self.paints[&mesh.texture_id];
                         ctx.draw_image_with_html_canvas_element(&paint.image, 0., 0.).unwrap();
 
                         ctx.restore();
