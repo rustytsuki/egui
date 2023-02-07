@@ -284,7 +284,7 @@ impl SkiaPainter {
                     let callback: Arc<EguiSkiaPaintCallback> = data.callback.downcast().unwrap();
                     let rect = data.rect;
 
-                    let skia_clip_rect = Rect::new(
+                    let mut skia_clip_rect = Rect::new(
                         skclip_rect.left * pixels_per_point,
                         skclip_rect.top * pixels_per_point,
                         skclip_rect.right * pixels_per_point,
@@ -298,11 +298,22 @@ impl SkiaPainter {
                         rect.max.y * pixels_per_point,
                     );
 
+                    let clip_rect = if skia_clip_rect.intersect(&skia_rect) {
+                        Rect::new(
+                            skia_clip_rect.left.max(skia_rect.left),
+                            skia_clip_rect.top.max(skia_rect.top),
+                            skia_clip_rect.right.min(skia_rect.right),
+                            skia_clip_rect.bottom.min(skia_rect.bottom),
+                        )
+                    } else {
+                        Rect::new(0., 0., 0., 0.)
+                    };
+
                     let mut drawable: Drawable = callback.callback.deref()(skia_rect, pixels_per_point).0.unwrap();
 
                     let mut arc = skia_safe::AutoCanvasRestore::guard(canvas, true);
 
-                    arc.clip_rect(skia_clip_rect, ClipOp::default(), true);
+                    arc.clip_rect(clip_rect, ClipOp::default(), true);
 
                     drawable.draw(&mut arc, None);
                 }
