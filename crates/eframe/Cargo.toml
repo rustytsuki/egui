@@ -67,6 +67,7 @@ __screenshot = ["dep:image"]
 wgpu = ["dep:wgpu", "dep:egui-wgpu"]
 
 skia = ["dep:skia-safe", "dep:skia-bindings", "dep:glutin", "dep:gl-rs", "dep:softbuffer"]
+skia_force_cpu = []
 
 html5_canvas_2d = []
 
