@@ -45,7 +45,7 @@ impl SkiaWinitApp {
 
         let window_settings = epi_integration::load_window_settings(storage);
 
-        let window_builder = epi_integration::window_builder(native_options, &window_settings)
+        let window_builder = epi_integration::window_builder(event_loop, title, native_options, window_settings)
             .with_title(title)
             .with_transparent(native_options.transparent)
             // Keep hidden until we've painted something. See https://github.com/emilk/egui/pull/2279
@@ -256,8 +256,8 @@ impl WinitApp for SkiaWinitApp {
         &mut self,
         event_loop: &EventLoopWindowTarget<UserEvent>,
         event: &winit::event::Event<'_, UserEvent>,
-    ) -> EventResult {
-        match event {
+    ) -> Result<EventResult> {
+        Ok(match event {
             winit::event::Event::Resumed => {
                 if self.running.is_none() {
                     self.init_run_state(event_loop);
@@ -323,7 +323,7 @@ impl WinitApp for SkiaWinitApp {
                         winit::event::WindowEvent::CloseRequested
                             if running.integration.should_close() =>
                         {
-                            return EventResult::Exit
+                            return Ok(EventResult::Exit);
                         }
                         _ => {}
                     }
@@ -362,7 +362,7 @@ impl WinitApp for SkiaWinitApp {
                 }
             }
             _ => EventResult::Wait,
-        }
+        })
     }
 }
 
@@ -370,23 +370,14 @@ pub fn run_skia(
     app_name: &str,
     mut native_options: epi::NativeOptions,
     app_creator: epi::AppCreator,
-) {
+) -> Result<()> {
     if native_options.run_and_return {
         with_event_loop(native_options, |event_loop, mut native_options| {
-            if native_options.centered {
-                center_window_pos(event_loop.available_monitors().next(), &mut native_options);
-            }
-
             let skia_eframe = SkiaWinitApp::new(event_loop, app_name, native_options, app_creator);
-            run_and_return(event_loop, skia_eframe);
-        });
+            run_and_return(event_loop, skia_eframe)
+        })
     } else {
         let event_loop = create_event_loop_builder(&mut native_options).build();
-
-        if native_options.centered {
-            center_window_pos(event_loop.available_monitors().next(), &mut native_options);
-        }
-
         let skia_eframe = SkiaWinitApp::new(&event_loop, app_name, native_options, app_creator);
         run_and_exit(event_loop, skia_eframe);
     }

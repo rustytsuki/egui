@@ -218,7 +218,7 @@ impl Default for TableScrollOptions {
 pub struct TableBuilder<'a> {
     ui: &'a mut Ui,
     columns: Vec<Column>,
-    striped: bool,
+    striped: Option<bool>,
     resizable: bool,
     cell_layout: egui::Layout,
     scroll_options: TableScrollOptions,
@@ -230,16 +230,18 @@ impl<'a> TableBuilder<'a> {
         Self {
             ui,
             columns: Default::default(),
-            striped: false,
+            striped: None,
             resizable: false,
             cell_layout,
             scroll_options: Default::default(),
         }
     }
 
-    /// Enable striped row background for improved readability (default: `false`)
+    /// Enable striped row background for improved readability.
+    ///
+    /// Default is whatever is in [`egui::Visuals::striped`].
     pub fn striped(mut self, striped: bool) -> Self {
-        self.striped = striped;
+        self.striped = Some(striped);
         self
     }
 
@@ -373,6 +375,8 @@ impl<'a> TableBuilder<'a> {
             scroll_options,
         } = self;
 
+        let striped = striped.unwrap_or(ui.visuals().striped);
+
         let state_id = ui.id().with("__table_state");
 
         let initial_widths =
@@ -431,6 +435,8 @@ impl<'a> TableBuilder<'a> {
             scroll_options,
         } = self;
 
+        let striped = striped.unwrap_or(ui.visuals().striped);
+
         let state_id = ui.id().with("__table_state");
 
         let initial_widths =
@@ -473,7 +479,7 @@ impl TableState {
         let rect = Rect::from_min_size(ui.available_rect_before_wrap().min, Vec2::ZERO);
         ui.ctx().check_for_id_clash(state_id, rect, "Table");
 
-        if let Some(state) = ui.data().get_persisted::<Self>(state_id) {
+        if let Some(state) = ui.data_mut(|d| d.get_persisted::<Self>(state_id)) {
             // make sure that the stored widths aren't out-dated
             if state.column_widths.len() == default_widths.len() {
                 return (true, state);
@@ -489,7 +495,7 @@ impl TableState {
     }
 
     fn store(self, ui: &egui::Ui, state_id: egui::Id) {
-        ui.data().insert_persisted(state_id, self);
+        ui.data_mut(|d| d.insert_persisted(state_id, self));
     }
 }
 
@@ -674,14 +680,12 @@ impl<'a> Table<'a> {
                     }
                 }
 
-                let dragging_something_else = {
-                    let pointer = &ui.input().pointer;
-                    pointer.any_down() || pointer.any_pressed()
-                };
+                let dragging_something_else =
+                    ui.input(|i| i.pointer.any_down() || i.pointer.any_pressed());
                 let resize_hover = resize_response.hovered() && !dragging_something_else;
 
                 if resize_hover || resize_response.dragged() {
-                    ui.output().cursor_icon = egui::CursorIcon::ResizeColumn;
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeColumn);
                 }
 
                 let stroke = if resize_response.dragged() {
@@ -1020,6 +1024,7 @@ impl<'a, 'b> TableRow<'a, 'b> {
     /// Add the contents of a column.
     ///
     /// Return the used space (`min_rect`) plus the [`Response`] of the whole cell.
+    #[cfg_attr(debug_assertions, track_caller)]
     pub fn col(&mut self, add_cell_contents: impl FnOnce(&mut Ui)) -> (Rect, Response) {
         let col_index = self.col_index;
 

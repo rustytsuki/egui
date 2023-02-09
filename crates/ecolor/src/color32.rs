@@ -171,11 +171,46 @@ impl Color32 {
         Rgba::from(*self).to_srgba_unmultiplied()
     }
 
-    /// Multiply with 0.5 to make color half as opaque.
+    /// Multiply with 0.5 to make color half as opaque, perceptually.
+    ///
+    /// Fast multiplication in gamma-space.
+    ///
+    /// This is perceptually even, and faster that [`Self::linear_multiply`].
+    #[inline]
+    pub fn gamma_multiply(self, factor: f32) -> Color32 {
+        crate::ecolor_assert!(0.0 <= factor && factor <= 1.0);
+        let Self([r, g, b, a]) = self;
+        Self([
+            (r as f32 * factor + 0.5) as u8,
+            (g as f32 * factor + 0.5) as u8,
+            (b as f32 * factor + 0.5) as u8,
+            (a as f32 * factor + 0.5) as u8,
+        ])
+    }
+
+    /// Multiply with 0.5 to make color half as opaque in linear space.
+    ///
+    /// This is using linear space, which is not perceptually even.
+    /// You may want to use [`Self::gamma_multiply`] instead.
     pub fn linear_multiply(self, factor: f32) -> Color32 {
         crate::ecolor_assert!(0.0 <= factor && factor <= 1.0);
         // As an unfortunate side-effect of using premultiplied alpha
         // we need a somewhat expensive conversion to linear space and back.
         Rgba::from(self).multiply(factor).into()
+    }
+
+    /// Converts to floating point values in the range 0-1 without any gamma space conversion.
+    ///
+    /// Use this with great care! In almost all cases, you want to convert to [`crate::Rgba`] instead
+    /// in order to obtain linear space color values.
+    #[inline]
+    pub fn to_normalized_gamma_f32(self) -> [f32; 4] {
+        let Self([r, g, b, a]) = self;
+        [
+            r as f32 / 255.0,
+            g as f32 / 255.0,
+            b as f32 / 255.0,
+            a as f32 / 255.0,
+        ]
     }
 }

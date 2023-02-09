@@ -63,7 +63,7 @@ impl WebPainter for WebPainterCanvas2D {
     /// Update all internal textures and paint gui.
     fn paint_and_update_textures(
         &mut self,
-        clear_color: Rgba,
+        clear_color: [f32; 4],
         clipped_primitives: &[egui::ClippedPrimitive],
         pixels_per_point: f32,
         textures_delta: &egui::TexturesDelta,

@@ -174,6 +174,9 @@ pub struct Style {
     /// ```
     pub text_styles: BTreeMap<TextStyle, FontId>,
 
+    /// The style to use for [`DragValue`] text.
+    pub drag_value_text_style: TextStyle,
+
     /// If set, labels buttons wtc will use this to determine whether or not
     /// to wrap the text at the right edge of the [`Ui`] they are in.
     /// By default this is `None`.
@@ -216,6 +219,7 @@ impl Style {
     pub fn interact_selectable(&self, response: &Response, selected: bool) -> WidgetVisuals {
         let mut visuals = *self.visuals.widgets.style(response);
         if selected {
+            visuals.weak_bg_fill = self.visuals.selection.bg_fill;
             visuals.bg_fill = self.visuals.selection.bg_fill;
             // visuals.bg_stroke = self.visuals.selection.stroke;
             visuals.fg_stroke = self.visuals.selection.stroke;
@@ -264,8 +268,11 @@ pub struct Spacing {
     /// Anything clickable should be (at least) this size.
     pub interact_size: Vec2, // TODO(emilk): rename min_interact_size ?
 
-    /// Default width of a [`Slider`] and [`ComboBox`](crate::ComboBox).
-    pub slider_width: f32, // TODO(emilk): rename big_interact_size ?
+    /// Default width of a [`Slider`].
+    pub slider_width: f32,
+
+    /// Default (minimum) width of a [`ComboBox`](crate::ComboBox).
+    pub combo_width: f32,
 
     /// Default width of a [`TextEdit`].
     pub text_edit_width: f32,
@@ -292,6 +299,9 @@ pub struct Spacing {
     pub combo_height: f32,
 
     pub scroll_bar_width: f32,
+
+    /// Make sure the scroll handle is at least this big
+    pub scroll_handle_min_length: f32,
 
     /// Margin between contents and scroll bar.
     pub scroll_bar_inner_margin: f32,
@@ -471,6 +481,8 @@ pub struct Visuals {
     pub window_fill: Color32,
     pub window_stroke: Stroke,
 
+    pub menu_rounding: Rounding,
+
     /// Panel background color
     pub panel_fill: Color32,
 
@@ -490,6 +502,18 @@ pub struct Visuals {
 
     /// Show a background behind collapsing headers.
     pub collapsing_header_frame: bool,
+
+    /// Draw a vertical lien left of indented region, in e.g. [`crate::CollapsingHeader`].
+    pub indent_has_left_vline: bool,
+
+    /// Wether or not Grids and Tables should be striped by default
+    /// (have alternating rows differently colored).
+    pub striped: bool,
+
+    /// Show trailing color behind the circle of a [`Slider`]. Default is OFF.
+    ///
+    /// Enabling this will affect ALL sliders, and can be enabled/disabled per slider with [`Slider::trailing_fill`].
+    pub slider_trailing_fill: bool,
 }
 
 impl Visuals {
@@ -527,7 +551,7 @@ impl Visuals {
     // TODO(emilk): replace with an alpha
     #[inline(always)]
     pub fn fade_out_to_color(&self) -> Color32 {
-        self.widgets.noninteractive.bg_fill
+        self.widgets.noninteractive.weak_bg_fill
     }
 
     /// Returned a "grayed out" version of the given color.
@@ -560,7 +584,9 @@ pub struct Widgets {
     /// The style of an interactive widget, such as a button, at rest.
     pub inactive: WidgetVisuals,
 
-    /// The style of an interactive widget while you hover it.
+    /// The style of an interactive widget while you hover it, or when it is highlighted.
+    ///
+    /// See [`Response::hovered`], [`Response::highlighted`] and [`Response::highlight`].
     pub hovered: WidgetVisuals,
 
     /// The style of an interactive widget as you are clicking or dragging it.
@@ -576,7 +602,7 @@ impl Widgets {
             &self.noninteractive
         } else if response.is_pointer_button_down_on() || response.has_focus() {
             &self.active
-        } else if response.hovered() {
+        } else if response.hovered() || response.highlighted() {
             &self.hovered
         } else {
             &self.inactive
@@ -588,8 +614,16 @@ impl Widgets {
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct WidgetVisuals {
-    /// Background color of widget.
+    /// Background color of widgets that must have a background fill,
+    /// such as the slider background, a checkbox background, or a radio button background.
+    ///
+    /// Must never be [`Color32::TRANSPARENT`].
     pub bg_fill: Color32,
+
+    /// Background color of widgets that can _optionally_ have a background fill, such as buttons.
+    ///
+    /// May be [`Color32::TRANSPARENT`].
+    pub weak_bg_fill: Color32,
 
     /// For surrounding rectangle of things that need it,
     /// like buttons, the box of the checkbox, etc.
@@ -657,6 +691,7 @@ impl Default for Style {
             override_font_id: None,
             override_text_style: None,
             text_styles: default_text_styles(),
+            drag_value_text_style: TextStyle::Button,
             wrap: None,
             spacing: Spacing::default(),
             interaction: Interaction::default(),
@@ -678,6 +713,7 @@ impl Default for Spacing {
             indent: 18.0, // match checkbox/radio-button with `button_padding.x + icon_width + icon_spacing`
             interact_size: vec2(40.0, 18.0),
             slider_width: 100.0,
+            combo_width: 100.0,
             text_edit_width: 280.0,
             icon_width: 14.0,
             icon_width_inner: 8.0,
@@ -685,6 +721,7 @@ impl Default for Spacing {
             tooltip_width: 600.0,
             combo_height: 200.0,
             scroll_bar_width: 8.0,
+            scroll_handle_min_length: 12.0,
             scroll_bar_inner_margin: 4.0,
             scroll_bar_outer_margin: 0.0,
             indent_ends_with_horizontal_line: false,
@@ -711,8 +748,8 @@ impl Visuals {
             widgets: Widgets::default(),
             selection: Selection::default(),
             hyperlink_color: Color32::from_rgb(90, 170, 255),
-            faint_bg_color: Color32::from_gray(35),
-            extreme_bg_color: Color32::from_gray(10), // e.g. TextEdit background
+            faint_bg_color: Color32::from_additive_luminance(5), // visible, but barely so
+            extreme_bg_color: Color32::from_gray(10),            // e.g. TextEdit background
             code_bg_color: Color32::from_gray(64),
             warn_fg_color: Color32::from_rgb(255, 143, 0), // orange
             error_fg_color: Color32::from_rgb(255, 0, 0),  // red
@@ -721,6 +758,8 @@ impl Visuals {
             window_shadow: Shadow::big_dark(),
             window_fill: Color32::from_gray(27),
             window_stroke: Stroke::new(1.0, Color32::from_gray(60)),
+
+            menu_rounding: Rounding::same(6.0),
 
             panel_fill: Color32::from_gray(27),
 
@@ -731,6 +770,11 @@ impl Visuals {
             clip_rect_margin: 3.0, // should be at least half the size of the widest frame stroke + max WidgetVisuals::expansion
             button_frame: true,
             collapsing_header_frame: false,
+            indent_has_left_vline: true,
+
+            striped: false,
+
+            slider_trailing_fill: false,
         }
     }
 
@@ -741,8 +785,8 @@ impl Visuals {
             widgets: Widgets::light(),
             selection: Selection::light(),
             hyperlink_color: Color32::from_rgb(0, 155, 255),
-            faint_bg_color: Color32::from_gray(242),
-            extreme_bg_color: Color32::from_gray(255), // e.g. TextEdit background
+            faint_bg_color: Color32::from_additive_luminance(5), // visible, but barely so
+            extreme_bg_color: Color32::from_gray(255),           // e.g. TextEdit background
             code_bg_color: Color32::from_gray(230),
             warn_fg_color: Color32::from_rgb(255, 100, 0), // slightly orange red. it's difficult to find a warning color that pops on bright background.
             error_fg_color: Color32::from_rgb(255, 0, 0),  // red
@@ -791,6 +835,7 @@ impl Widgets {
     pub fn dark() -> Self {
         Self {
             noninteractive: WidgetVisuals {
+                weak_bg_fill: Color32::from_gray(27),
                 bg_fill: Color32::from_gray(27),
                 bg_stroke: Stroke::new(1.0, Color32::from_gray(60)), // separators, indentation lines
                 fg_stroke: Stroke::new(1.0, Color32::from_gray(140)), // normal text color
@@ -798,13 +843,15 @@ impl Widgets {
                 expansion: 0.0,
             },
             inactive: WidgetVisuals {
-                bg_fill: Color32::from_gray(60), // button background
+                weak_bg_fill: Color32::from_gray(60), // button background
+                bg_fill: Color32::from_gray(60),      // checkbox background
                 bg_stroke: Default::default(),
                 fg_stroke: Stroke::new(1.0, Color32::from_gray(180)), // button text
                 rounding: Rounding::same(2.0),
                 expansion: 0.0,
             },
             hovered: WidgetVisuals {
+                weak_bg_fill: Color32::from_gray(70),
                 bg_fill: Color32::from_gray(70),
                 bg_stroke: Stroke::new(1.0, Color32::from_gray(150)), // e.g. hover over window edge or button
                 fg_stroke: Stroke::new(1.5, Color32::from_gray(240)),
@@ -812,6 +859,7 @@ impl Widgets {
                 expansion: 1.0,
             },
             active: WidgetVisuals {
+                weak_bg_fill: Color32::from_gray(55),
                 bg_fill: Color32::from_gray(55),
                 bg_stroke: Stroke::new(1.0, Color32::WHITE),
                 fg_stroke: Stroke::new(2.0, Color32::WHITE),
@@ -819,6 +867,7 @@ impl Widgets {
                 expansion: 1.0,
             },
             open: WidgetVisuals {
+                weak_bg_fill: Color32::from_gray(27),
                 bg_fill: Color32::from_gray(27),
                 bg_stroke: Stroke::new(1.0, Color32::from_gray(60)),
                 fg_stroke: Stroke::new(1.0, Color32::from_gray(210)),
@@ -831,6 +880,7 @@ impl Widgets {
     pub fn light() -> Self {
         Self {
             noninteractive: WidgetVisuals {
+                weak_bg_fill: Color32::from_gray(248),
                 bg_fill: Color32::from_gray(248),
                 bg_stroke: Stroke::new(1.0, Color32::from_gray(190)), // separators, indentation lines
                 fg_stroke: Stroke::new(1.0, Color32::from_gray(80)),  // normal text color
@@ -838,13 +888,15 @@ impl Widgets {
                 expansion: 0.0,
             },
             inactive: WidgetVisuals {
-                bg_fill: Color32::from_gray(230), // button background
+                weak_bg_fill: Color32::from_gray(230), // button background
+                bg_fill: Color32::from_gray(230),      // checkbox background
                 bg_stroke: Default::default(),
                 fg_stroke: Stroke::new(1.0, Color32::from_gray(60)), // button text
                 rounding: Rounding::same(2.0),
                 expansion: 0.0,
             },
             hovered: WidgetVisuals {
+                weak_bg_fill: Color32::from_gray(220),
                 bg_fill: Color32::from_gray(220),
                 bg_stroke: Stroke::new(1.0, Color32::from_gray(105)), // e.g. hover over window edge or button
                 fg_stroke: Stroke::new(1.5, Color32::BLACK),
@@ -852,6 +904,7 @@ impl Widgets {
                 expansion: 1.0,
             },
             active: WidgetVisuals {
+                weak_bg_fill: Color32::from_gray(165),
                 bg_fill: Color32::from_gray(165),
                 bg_stroke: Stroke::new(1.0, Color32::BLACK),
                 fg_stroke: Stroke::new(2.0, Color32::BLACK),
@@ -859,6 +912,7 @@ impl Widgets {
                 expansion: 1.0,
             },
             open: WidgetVisuals {
+                weak_bg_fill: Color32::from_gray(220),
                 bg_fill: Color32::from_gray(220),
                 bg_stroke: Stroke::new(1.0, Color32::from_gray(160)),
                 fg_stroke: Stroke::new(1.0, Color32::BLACK),
@@ -885,6 +939,7 @@ impl Style {
             override_font_id,
             override_text_style,
             text_styles,
+            drag_value_text_style,
             wrap: _,
             spacing,
             interaction,
@@ -922,6 +977,19 @@ impl Style {
                         let text =
                             crate::RichText::new(style.to_string()).text_style(style.clone());
                         ui.selectable_value(override_text_style, Some(style), text);
+                    }
+                });
+            ui.end_row();
+
+            ui.label("Text style of DragValue:");
+            crate::ComboBox::from_id_source("drag_value_text_style")
+                .selected_text(drag_value_text_style.to_string())
+                .show_ui(ui, |ui| {
+                    let all_text_styles = ui.style().text_styles();
+                    for style in all_text_styles {
+                        let text =
+                            crate::RichText::new(style.to_string()).text_style(style.clone());
+                        ui.selectable_value(drag_value_text_style, style, text);
                     }
                 });
             ui.end_row();
@@ -974,6 +1042,7 @@ impl Spacing {
             indent,
             interact_size,
             slider_width,
+            combo_width,
             text_edit_width,
             icon_width,
             icon_width_inner,
@@ -982,6 +1051,7 @@ impl Spacing {
             indent_ends_with_horizontal_line,
             combo_height,
             scroll_bar_width,
+            scroll_handle_min_length,
             scroll_bar_inner_margin,
             scroll_bar_outer_margin,
         } = self;
@@ -1003,12 +1073,20 @@ impl Spacing {
             ui.label("Slider width");
         });
         ui.horizontal(|ui| {
+            ui.add(DragValue::new(combo_width).clamp_range(0.0..=1000.0));
+            ui.label("ComboBox width");
+        });
+        ui.horizontal(|ui| {
             ui.add(DragValue::new(text_edit_width).clamp_range(0.0..=1000.0));
             ui.label("TextEdit width");
         });
         ui.horizontal(|ui| {
             ui.add(DragValue::new(scroll_bar_width).clamp_range(0.0..=32.0));
             ui.label("Scroll-bar width");
+        });
+        ui.horizontal(|ui| {
+            ui.add(DragValue::new(scroll_handle_min_length).clamp_range(0.0..=32.0));
+            ui.label("Scroll-bar handle min length");
         });
         ui.horizontal(|ui| {
             ui.add(DragValue::new(scroll_bar_inner_margin).clamp_range(0.0..=32.0));
@@ -1175,13 +1253,17 @@ impl Selection {
 impl WidgetVisuals {
     pub fn ui(&mut self, ui: &mut crate::Ui) {
         let Self {
-            bg_fill,
+            weak_bg_fill,
+            bg_fill: mandatory_bg_fill,
             bg_stroke,
             rounding,
             fg_stroke,
             expansion,
         } = self;
-        ui_color(ui, bg_fill, "background fill");
+        ui_color(ui, weak_bg_fill, "optional background fill")
+            .on_hover_text("For buttons, combo-boxes, etc");
+        ui_color(ui, mandatory_bg_fill, "mandatory background fill")
+            .on_hover_text("For checkboxes, sliders, etc");
         stroke_ui(ui, bg_stroke, "background stroke");
 
         rounding_ui(ui, rounding);
@@ -1243,6 +1325,8 @@ impl Visuals {
             window_fill,
             window_stroke,
 
+            menu_rounding,
+
             panel_fill,
 
             popup_shadow,
@@ -1253,10 +1337,15 @@ impl Visuals {
             clip_rect_margin,
             button_frame,
             collapsing_header_frame,
+            indent_has_left_vline,
+
+            striped,
+
+            slider_trailing_fill,
         } = self;
 
         ui.collapsing("Background Colors", |ui| {
-            ui_color(ui, &mut widgets.inactive.bg_fill, "Buttons");
+            ui_color(ui, &mut widgets.inactive.weak_bg_fill, "Buttons");
             ui_color(ui, window_fill, "Windows");
             ui_color(ui, panel_fill, "Panels");
             ui_color(ui, faint_bg_color, "Faint accent").on_hover_text(
@@ -1267,14 +1356,15 @@ impl Visuals {
         });
 
         ui.collapsing("Window", |ui| {
-            // Common shortcuts
             ui_color(ui, window_fill, "Fill");
             stroke_ui(ui, window_stroke, "Outline");
-
             rounding_ui(ui, window_rounding);
-
             shadow_ui(ui, window_shadow, "Shadow");
-            shadow_ui(ui, popup_shadow, "Shadow (small menus and popups)");
+        });
+
+        ui.collapsing("Menus and popups", |ui| {
+            rounding_ui(ui, menu_rounding);
+            shadow_ui(ui, popup_shadow, "Shadow");
         });
 
         ui.collapsing("Widgets", |ui| widgets.ui(ui));
@@ -1307,6 +1397,14 @@ impl Visuals {
 
         ui.checkbox(button_frame, "Button has a frame");
         ui.checkbox(collapsing_header_frame, "Collapsing header has a frame");
+        ui.checkbox(
+            indent_has_left_vline,
+            "Paint a vertical line to the left of indented regions",
+        );
+
+        ui.checkbox(striped, "By default, add stripes to grids and tables?");
+
+        ui.checkbox(slider_trailing_fill, "Add trailing color to sliders");
 
         ui.vertical_centered(|ui| reset_button(ui, self));
     }

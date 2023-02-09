@@ -1,5 +1,5 @@
 use skia_bindings::SkPixmap;
-use skia_safe::{Surface, ImageInfo, ColorType, AlphaType, wrapper::ValueWrapper, Pixel, Handle};
+use skia_safe::{Surface, ImageInfo, ColorType, AlphaType, Pixel, Handle};
 use softbuffer::GraphicsContext;
 use winit::window::Window;
 

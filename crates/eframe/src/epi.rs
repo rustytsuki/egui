@@ -145,20 +145,25 @@ pub trait App {
     /// The size limit of the web app canvas.
     ///
     /// By default the max size is [`egui::Vec2::INFINITY`], i.e. unlimited.
-    ///
-    /// A large canvas can lead to bad frame rates on some older browsers on some platforms
-    /// (see <https://bugzilla.mozilla.org/show_bug.cgi?id=1010527#c0>).
     fn max_size_points(&self) -> egui::Vec2 {
         egui::Vec2::INFINITY
     }
 
-    /// Background color for the app, e.g. what is sent to `gl.clearColor`.
+    /// Background color values for the app, e.g. what is sent to `gl.clearColor`.
+    ///
     /// This is the background of your windows if you don't set a central panel.
-    fn clear_color(&self, _visuals: &egui::Visuals) -> egui::Rgba {
+    ///
+    /// ATTENTION:
+    /// Since these float values go to the render as-is, any color space conversion as done
+    /// e.g. by converting from [`egui::Color32`] to [`egui::Rgba`] may cause incorrect results.
+    /// egui recommends that rendering backends use a normal "gamma-space" (non-sRGB-aware) blending,
+    ///  which means the values you return here should also be in `sRGB` gamma-space in the 0-1 range.
+    /// You can use [`egui::Color32::to_normalized_gamma_f32`] for this.
+    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
         // NOTE: a bright gray makes the shadows of the windows look weird.
         // We use a bit of transparency so that if the user switches on the
         // `transparent()` option they get immediate results.
-        egui::Color32::from_rgba_unmultiplied(12, 12, 12, 180).into()
+        egui::Color32::from_rgba_unmultiplied(12, 12, 12, 180).to_normalized_gamma_f32()
 
         // _visuals.window_fill() would also be a natural choice
     }
@@ -176,7 +181,7 @@ pub trait App {
     }
 
     /// If `true` a warm-up call to [`Self::update`] will be issued where
-    /// `ctx.memory().everything_is_visible()` will be set to `true`.
+    /// `ctx.memory(|mem| mem.everything_is_visible())` will be set to `true`.
     ///
     /// This can help pre-caching resources loaded by different parts of the UI, preventing stutter later on.
     ///
@@ -258,10 +263,10 @@ pub struct NativeOptions {
     /// The initial inner size of the native window in points (logical pixels).
     pub initial_window_size: Option<egui::Vec2>,
 
-    /// The minimum inner window size
+    /// The minimum inner window size in points (logical pixels).
     pub min_window_size: Option<egui::Vec2>,
 
-    /// The maximum inner window size
+    /// The maximum inner window size in points (logical pixels).
     pub max_window_size: Option<egui::Vec2>,
 
     /// Should the app window be resizable?
@@ -432,6 +437,7 @@ impl NativeOptions {
             match dark_light::detect() {
                 dark_light::Mode::Dark => Some(Theme::Dark),
                 dark_light::Mode::Light => Some(Theme::Light),
+                dark_light::Mode::Default => None,
             }
         } else {
             None
@@ -742,7 +748,20 @@ impl Frame {
     #[doc(alias = "exit")]
     #[doc(alias = "quit")]
     pub fn close(&mut self) {
+        tracing::debug!("eframe::Frame::close called");
         self.output.close = true;
+    }
+
+    /// Minimize or unminimize window. (native only)
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn set_minimized(&mut self, minimized: bool) {
+        self.output.minimized = Some(minimized);
+    }
+
+    /// Maximize or unmaximize window. (native only)
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn set_maximized(&mut self, maximized: bool) {
+        self.output.maximized = Some(maximized);
     }
 
     /// Tell `eframe` to close the desktop window.
@@ -756,6 +775,7 @@ impl Frame {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn set_window_size(&mut self, size: egui::Vec2) {
         self.output.window_size = Some(size);
+        self.info.window_info.size = size; // so that subsequent calls see the updated value
     }
 
     /// Set the desired title of the window.
@@ -776,12 +796,14 @@ impl Frame {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn set_fullscreen(&mut self, fullscreen: bool) {
         self.output.fullscreen = Some(fullscreen);
+        self.info.window_info.fullscreen = fullscreen; // so that subsequent calls see the updated value
     }
 
     /// set the position of the outer window.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn set_window_pos(&mut self, pos: egui::Pos2) {
         self.output.window_pos = Some(pos);
+        self.info.window_info.position = Some(pos); // so that subsequent calls see the updated value
     }
 
     /// When called, the native window will follow the
@@ -852,6 +874,12 @@ pub struct WindowInfo {
 
     /// Are we in fullscreen mode?
     pub fullscreen: bool,
+
+    /// Are we minimized?
+    pub minimized: bool,
+
+    /// Are we maximized?
+    pub maximized: bool,
 
     /// Window inner size in egui points (logical pixels).
     pub size: egui::Vec2,
@@ -1035,5 +1063,13 @@ pub(crate) mod backend {
         /// Set to some bool to tell the window always on top.
         #[cfg(not(target_arch = "wasm32"))]
         pub always_on_top: Option<bool>,
+
+        /// Set to some bool to minimize or unminimize window.
+        #[cfg(not(target_arch = "wasm32"))]
+        pub minimized: Option<bool>,
+
+        /// Set to some bool to maximize or unmaximize window.
+        #[cfg(not(target_arch = "wasm32"))]
+        pub maximized: Option<bool>,
     }
 }

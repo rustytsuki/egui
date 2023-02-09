@@ -8,14 +8,14 @@ pub(crate) struct State {
 
 impl State {
     pub fn load(ctx: &Context, id: Id) -> Option<Self> {
-        ctx.data().get_temp(id)
+        ctx.data_mut(|d| d.get_temp(id))
     }
 
     pub fn store(self, ctx: &Context, id: Id) {
         // We don't persist Grids, because
         // A) there are potentially a lot of them, using up a lot of space (and therefore serialization time)
         // B) if the code changes, the grid _should_ change, and not remember old sizes
-        ctx.data().insert_temp(id, self);
+        ctx.data_mut(|d| d.insert_temp(id, self));
     }
 
     fn set_min_col_width(&mut self, col: usize, width: f32) {
@@ -278,7 +278,7 @@ impl GridLayout {
 pub struct Grid {
     id_source: Id,
     num_columns: Option<usize>,
-    striped: bool,
+    striped: Option<bool>,
     min_col_width: Option<f32>,
     min_row_height: Option<f32>,
     max_cell_size: Vec2,
@@ -292,7 +292,7 @@ impl Grid {
         Self {
             id_source: Id::new(id_source),
             num_columns: None,
-            striped: false,
+            striped: None,
             min_col_width: None,
             min_row_height: None,
             max_cell_size: Vec2::INFINITY,
@@ -310,9 +310,9 @@ impl Grid {
     /// If `true`, add a subtle background color to every other row.
     ///
     /// This can make a table easier to read.
-    /// Default: `false`.
+    /// Default is whatever is in [`crate::Visuals::striped`].
     pub fn striped(mut self, striped: bool) -> Self {
-        self.striped = striped;
+        self.striped = Some(striped);
         self
     }
 
@@ -371,6 +371,7 @@ impl Grid {
             spacing,
             start_row,
         } = self;
+        let striped = striped.unwrap_or(ui.visuals().striped);
         let min_col_width = min_col_width.unwrap_or_else(|| ui.spacing().interact_size.x);
         let min_row_height = min_row_height.unwrap_or_else(|| ui.spacing().interact_size.y);
         let spacing = spacing.unwrap_or_else(|| ui.spacing().item_spacing);

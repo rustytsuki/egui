@@ -61,7 +61,7 @@ impl SkiaWindowContext {
         }
     }
 
-    pub fn clear(&mut self, screen_size_in_pixels: [u32; 2], clear_color: egui::Rgba) {
+    pub fn clear(&mut self, screen_size_in_pixels: [u32; 2], clear_color: [f32; 4]) {
         self.canvas().clear(Color4f::new(clear_color[0], clear_color[1], clear_color[2], clear_color[3]));
     }
 

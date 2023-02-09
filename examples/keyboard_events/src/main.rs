@@ -2,7 +2,7 @@
 
 use eframe::egui;
 use egui::*;
-fn main() {
+fn main() -> Result<(), eframe::Error> {
     // Log to stdout (if you run with `RUST_LOG=debug`).
     tracing_subscriber::fmt::init();
 
@@ -11,7 +11,7 @@ fn main() {
         "Keyboard events",
         options,
         Box::new(|_cc| Box::new(Content::default())),
-    );
+    )
 }
 
 #[derive(Default)]
@@ -33,14 +33,14 @@ impl eframe::App for Content {
                     ui.label(&self.text);
                 });
 
-            if ctx.input().key_pressed(Key::A) {
+            if ctx.input(|i| i.key_pressed(Key::A)) {
                 self.text.push_str("\nPressed");
             }
-            if ctx.input().key_down(Key::A) {
+            if ctx.input(|i| i.key_down(Key::A)) {
                 self.text.push_str("\nHeld");
                 ui.ctx().request_repaint(); // make sure we note the holding.
             }
-            if ctx.input().key_released(Key::A) {
+            if ctx.input(|i| i.key_released(Key::A)) {
                 self.text.push_str("\nReleased");
             }
         });
