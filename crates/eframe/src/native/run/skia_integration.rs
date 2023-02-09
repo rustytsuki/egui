@@ -76,7 +76,9 @@ impl SkiaWinitApp {
             painter.max_texture_side(),
             skia_window.window(),
             system_theme,
-            storage
+            storage,
+            #[cfg(feature = "glow")] None,
+            #[cfg(feature = "wgpu")] None,
         );
         #[cfg(feature = "accesskit")]
         {
@@ -105,7 +107,9 @@ impl SkiaWinitApp {
         let mut app = app_creator(&epi::CreationContext {
             egui_ctx: integration.egui_ctx.clone(),
             integration_info: integration.frame.info(),
-            storage: integration.frame.storage()
+            storage: integration.frame.storage(),
+            #[cfg(feature = "glow")] gl: None,
+            #[cfg(feature = "wgpu")] wgpu_render_state: None,
         });
 
         if app.warm_up_enabled() {
@@ -139,7 +143,13 @@ impl WinitApp for SkiaWinitApp {
             running
                 .integration
                 .save(running.app.as_mut(), running.skia_window.window());
+            
+            #[cfg(feature = "glow")]
+            running.app.on_exit(None);
+
+            #[cfg(not(feature = "glow"))]
             running.app.on_exit();
+
             running.painter.destroy();
         }
     }
