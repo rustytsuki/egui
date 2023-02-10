@@ -660,7 +660,7 @@ mod glow_integration {
         
             let painter = match egui_glow::Painter::new(gl.clone(), "", self.native_options.shader_version) {
                 Ok(p) => p,
-                Err(_) => { return Err(crate::Error::Glutin(glutin::error::Error::from(glutin::error::ErrorKind::Misc)))},
+                Err(_e) => { return Err(crate::Error::Glutin(glutin::error::Error::from(glutin::error::ErrorKind::Misc)))},
             };
 
             let system_theme = self.native_options.system_theme();
