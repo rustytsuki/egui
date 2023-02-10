@@ -657,10 +657,11 @@ mod glow_integration {
                 &self.native_options,
             )?;
             let gl = Arc::new(gl);
-
-            let painter =
-                egui_glow::Painter::new(gl.clone(), "", self.native_options.shader_version)
-                    .unwrap_or_else(|error| panic!("some OpenGL error occurred {}\n", error));
+        
+            let painter = match egui_glow::Painter::new(gl.clone(), "", self.native_options.shader_version) {
+                Ok(p) => p,
+                Err(_) => { return Err(crate::Error::Glutin(glutin::error::Error::from(glutin::error::ErrorKind::Misc)))},
+            };
 
             let system_theme = self.native_options.system_theme();
             let mut integration = epi_integration::EpiIntegration::new(
