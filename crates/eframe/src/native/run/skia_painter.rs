@@ -175,7 +175,7 @@ impl SkiaPainter {
         });
 
         for primitive in clipped_primitives {
-            let skclip_rect = Rect::new(
+            let clip_rect = Rect::new(
                 primitive.clip_rect.min.x,
                 primitive.clip_rect.min.y,
                 primitive.clip_rect.max.x,
@@ -248,7 +248,7 @@ impl SkiaPainter {
                             ),
                         );
 
-                        arc.clip_rect(skclip_rect, ClipOp::default(), true);
+                        arc.clip_rect(clip_rect, ClipOp::default(), true);
 
                         // Egui use the uv coordinates 0,0 to get a white color when drawing vector graphics
                         // 0,0 is always a white dot on the font texture
@@ -284,30 +284,19 @@ impl SkiaPainter {
                     let callback: Arc<EguiSkiaPaintCallback> = data.callback.downcast().unwrap();
                     let rect = data.rect;
 
-                    let mut skia_clip_rect = Rect::new(
-                        skclip_rect.left * pixels_per_point,
-                        skclip_rect.top * pixels_per_point,
-                        skclip_rect.right * pixels_per_point,
-                        skclip_rect.bottom * pixels_per_point,
+                    let clip_rect_px = Rect::new(
+                        clip_rect.left * pixels_per_point,
+                        clip_rect.top * pixels_per_point,
+                        clip_rect.right * pixels_per_point,
+                        clip_rect.bottom * pixels_per_point,
                     );
 
-                    let skia_rect = Rect::new(
+                    let rect_px = Rect::new(
                         rect.min.x * pixels_per_point,
                         rect.min.y * pixels_per_point,
                         rect.max.x * pixels_per_point,
                         rect.max.y * pixels_per_point,
                     );
-
-                    let clip_rect = if skia_clip_rect.intersect(&skia_rect) {
-                        Rect::new(
-                            skia_clip_rect.left.max(skia_rect.left),
-                            skia_clip_rect.top.max(skia_rect.top),
-                            skia_clip_rect.right.min(skia_rect.right),
-                            skia_clip_rect.bottom.min(skia_rect.bottom),
-                        )
-                    } else {
-                        Rect::new(0., 0., 0., 0.)
-                    };
 
                     let info = egui::PaintCallbackInfo {
                         viewport: data.rect,
@@ -316,11 +305,11 @@ impl SkiaPainter {
                         screen_size_px,
                     };
 
-                    let mut drawable: Drawable = callback.callback.deref()(info, skia_rect).0.unwrap();
+                    let mut drawable: Drawable = callback.callback.deref()(info, rect_px).0.unwrap();
 
                     let mut arc = skia_safe::AutoCanvasRestore::guard(canvas, true);
 
-                    arc.clip_rect(clip_rect, ClipOp::default(), true);
+                    arc.clip_rect(clip_rect_px, ClipOp::default(), true);
 
                     drawable.draw(&mut arc, None);
                 }
