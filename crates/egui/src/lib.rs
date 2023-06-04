@@ -112,7 +112,7 @@
 //! ``` no_run
 //! # fn handle_platform_output(_: egui::PlatformOutput) {}
 //! # fn gather_input() -> egui::RawInput { egui::RawInput::default() }
-//! # fn paint(textures_detla: egui::TexturesDelta, _: Vec<egui::ClippedPrimitive>) {}
+//! # fn paint(textures_delta: egui::TexturesDelta, _: Vec<egui::ClippedPrimitive>) {}
 //! let mut ctx = egui::Context::default();
 //!
 //! // Game loop:
@@ -298,6 +298,7 @@
 
 #![allow(clippy::float_cmp)]
 #![allow(clippy::manual_range_contains)]
+#![forbid(unsafe_code)]
 
 mod animation_manager;
 pub mod containers;
@@ -353,10 +354,10 @@ pub mod text {
 
 pub use {
     containers::*,
-    context::Context,
+    context::{Context, RequestRepaintInfo},
     data::{
         input::*,
-        output::{self, CursorIcon, FullOutput, PlatformOutput, WidgetInfo},
+        output::{self, CursorIcon, FullOutput, PlatformOutput, UserAttentionType, WidgetInfo},
     },
     grid::Grid,
     id::{Id, IdMap},
@@ -513,18 +514,30 @@ pub mod special_emojis {
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum WidgetType {
     Label, // TODO(emilk): emit Label events
+
     /// e.g. a hyperlink
     Link,
+
     TextEdit,
+
     Button,
+
     Checkbox,
+
     RadioButton,
+
     SelectableLabel,
+
     ComboBox,
+
     Slider,
+
     DragValue,
+
     ColorButton,
+
     ImageButton,
+
     CollapsingHeader,
 
     /// If you cannot fit any of the above slots.

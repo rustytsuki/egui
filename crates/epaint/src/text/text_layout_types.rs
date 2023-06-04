@@ -351,7 +351,7 @@ pub struct Galley {
     pub pixels_per_point: f32,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Row {
     /// One for each `char`.
@@ -400,15 +400,18 @@ impl Default for RowVisuals {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Glyph {
     /// The character this glyph represents.
     pub chr: char,
 
-    /// Relative to the galley position.
+    /// Baseline position, relative to the galley.
     /// Logical position: pos.y is the same for all chars of the same [`TextFormat`].
     pub pos: Pos2,
+
+    /// `ascent` value from the font
+    pub ascent: f32,
 
     /// Advance width and font row height.
     pub size: Vec2,
@@ -428,7 +431,7 @@ impl Glyph {
     /// Same y range for all characters with the same [`TextFormat`].
     #[inline]
     pub fn logical_rect(&self) -> Rect {
-        Rect::from_min_size(self.pos, self.size)
+        Rect::from_min_size(self.pos - vec2(0.0, self.ascent), self.size)
     }
 }
 
@@ -847,7 +850,7 @@ impl Galley {
                 // keep same X coord
                 let x = self.pos_from_cursor(cursor).center().x;
                 let column = if x > self.rows[new_row].rect.right() {
-                    // beyond the end of this row - keep same colum
+                    // beyond the end of this row - keep same column
                     cursor.rcursor.column
                 } else {
                     self.rows[new_row].char_at(x)

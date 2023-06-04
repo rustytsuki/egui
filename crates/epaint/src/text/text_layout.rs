@@ -70,7 +70,7 @@ pub fn layout(fonts: &mut FontsImpl, job: Arc<LayoutJob>) -> Galley {
         for (i, row) in rows.iter_mut().enumerate() {
             let is_last_row = i + 1 == num_rows;
             let justify_row = justify && !row.ends_with_newline && !is_last_row;
-            halign_and_jusitfy_row(
+            halign_and_justify_row(
                 point_scale,
                 row,
                 job.halign,
@@ -123,7 +123,8 @@ fn layout_section(
             paragraph.glyphs.push(Glyph {
                 chr,
                 pos: pos2(paragraph.cursor_x, f32::NAN),
-                size: vec2(glyph_info.advance_width, font_height),
+                size: vec2(glyph_info.advance_width, glyph_info.row_height),
+                ascent: glyph_info.ascent,
                 uv_rect: glyph_info.uv_rect,
                 section_index,
             });
@@ -336,7 +337,7 @@ fn replace_last_glyph_with_overflow_character(
     }
 }
 
-fn halign_and_jusitfy_row(
+fn halign_and_justify_row(
     point_scale: PointScale,
     row: &mut Row,
     halign: Align,
@@ -434,17 +435,31 @@ fn galley_from_rows(point_scale: PointScale, job: Arc<LayoutJob>, mut rows: Vec<
     let mut max_x: f32 = 0.0;
     for row in &mut rows {
         let mut row_height = first_row_min_height.max(row.rect.height());
+        let mut row_ascent = 0.0f32;
         first_row_min_height = 0.0;
-        for glyph in &row.glyphs {
-            row_height = row_height.max(glyph.size.y);
+
+        // take metrics from the highest font in this row
+        if let Some(glyph) = row
+            .glyphs
+            .iter()
+            .max_by(|a, b| a.size.y.partial_cmp(&b.size.y).unwrap())
+        {
+            row_height = glyph.size.y;
+            row_ascent = glyph.ascent;
         }
         row_height = point_scale.round_to_pixel(row_height);
 
         // Now positions each glyph:
         for glyph in &mut row.glyphs {
             let format = &job.sections[glyph.section_index as usize].format;
-            glyph.pos.y = cursor_y + format.valign.to_factor() * (row_height - glyph.size.y);
-            glyph.pos.y = point_scale.round_to_pixel(glyph.pos.y);
+
+            let align_offset = match format.valign {
+                Align::Center | Align::Max => row_ascent,
+
+                // raised text.
+                Align::Min => glyph.ascent,
+            };
+            glyph.pos.y = cursor_y + align_offset;
         }
 
         row.rect.min.y = cursor_y;

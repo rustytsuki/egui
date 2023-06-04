@@ -973,12 +973,16 @@ pub struct Tessellator {
     pixels_per_point: f32,
     options: TessellationOptions,
     font_tex_size: [usize; 2],
+
     /// See [`TextureAtlas::prepared_discs`].
     prepared_discs: Vec<PreparedDisc>,
+
     /// size of feathering in points. normally the size of a physical pixel. 0.0 if disabled
     feathering: f32,
+
     /// Only used for culling
     clip_rect: Rect,
+
     scratchpad_points: Vec<Pos2>,
     scratchpad_path: Path,
 }
@@ -1215,7 +1219,7 @@ impl Tessellator {
         out.append_ref(mesh);
     }
 
-    /// Tessellate a line segment between the two points with the given stoken into a [`Mesh`].
+    /// Tessellate a line segment between the two points with the given stroke into a [`Mesh`].
     ///
     /// * `shape`: the mesh to tessellate.
     /// * `out`: triangles are appended to this.
@@ -1310,7 +1314,7 @@ impl Tessellator {
         rect.max = rect.max.at_most(pos2(1e7, 1e7));
 
         if rect.width() < self.feathering {
-            // Very thin - approximate by a vertial line-segment:
+            // Very thin - approximate by a vertical line-segment:
             let line = [rect.center_top(), rect.center_bottom()];
             if fill != Color32::TRANSPARENT {
                 self.tessellate_line(line, Stroke::new(rect.width(), fill), out);

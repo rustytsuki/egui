@@ -5,6 +5,9 @@ All notable changes to the `egui_glow` integration will be noted in this file.
 ## Unreleased
 
 
+## 0.22.0 - 2023-05-23
+
+
 ## 0.21.0 - 2023-02-08
 * Update to `glow` 0.12 ([#2695](https://github.com/emilk/egui/pull/2695)).
 * Remove the `screen_reader` feature ([#2669](https://github.com/emilk/egui/pull/2669)).
@@ -16,7 +19,7 @@ All notable changes to the `egui_glow` integration will be noted in this file.
 
 ## 0.20.0 - 2022-12-08
 * Allow empty textures.
-* Added `shader_version` variable on `EguiGlow::new` for easier cross compilling on different OpenGL | ES targets ([#1993](https://github.com/emilk/egui/pull/1993)).
+* Added `shader_version` variable on `EguiGlow::new` for easier cross compiling on different OpenGL | ES targets ([#1993](https://github.com/emilk/egui/pull/1993)).
 
 
 ## 0.19.0 - 2022-08-20

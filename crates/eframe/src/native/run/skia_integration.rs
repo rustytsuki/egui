@@ -1,4 +1,3 @@
-
 use super::{*, skia_winit_running::{SkiaWindowContext, SkiaWinitRunning}, skia_painter::SkiaPainter};
 use std::sync::Arc;
 
@@ -70,12 +69,15 @@ impl SkiaWinitApp {
 
         let painter = SkiaPainter::new(skia_window.is_cpu());
 
-        let system_theme = self.native_options.system_theme();
+        let system_theme = system_theme(skia_window.window(), &self.native_options);
+        let app_name = "";
         let mut integration = epi_integration::EpiIntegration::new(
             event_loop,
             painter.max_texture_side(),
             skia_window.window(),
             system_theme,
+            &self.app_name,
+            &self.native_options,
             storage,
             #[cfg(feature = "glow")] None,
             #[cfg(feature = "wgpu")] None,
@@ -94,10 +96,13 @@ impl SkiaWinitApp {
 
         {
             let event_loop_proxy = self.repaint_proxy.clone();
-            integration.egui_ctx.set_request_repaint_callback(move || {
+            integration.egui_ctx.set_request_repaint_callback(move |info| {
+                log::trace!("request_repaint_callback: {info:?}");
+                let when = Instant::now() + info.after;
+                let frame_nr = info.current_frame_nr;
                 event_loop_proxy
                     .lock()
-                    .send_event(UserEvent::RequestRepaint)
+                    .send_event(UserEvent::RequestRepaint { when, frame_nr })
                     .ok();
             });
         }
@@ -126,6 +131,12 @@ impl SkiaWinitApp {
 }
 
 impl WinitApp for SkiaWinitApp {
+    fn frame_nr(&self) -> u64 {
+        self.running
+        .as_ref()
+        .map_or(0, |r| r.integration.egui_ctx.frame_nr())
+    }
+
     fn is_focused(&self) -> bool {
         self.is_focused
     }
@@ -154,7 +165,7 @@ impl WinitApp for SkiaWinitApp {
         }
     }
 
-    fn paint(&mut self) -> EventResult {
+    fn run_ui_and_paint(&mut self) -> EventResult {
         if let Some(running) = &mut self.running {
             #[cfg(feature = "puffin")]
             puffin::GlobalProfiler::lock().new_frame();

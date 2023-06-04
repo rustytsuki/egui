@@ -40,8 +40,12 @@ pub fn read_window_info(
 
     let monitor = window.current_monitor().is_some();
     let monitor_size = if monitor {
-        let size = window.current_monitor().unwrap().size();
-        Some(egui::vec2(size.width as _, size.height as _))
+        let size = window
+            .current_monitor()
+            .unwrap()
+            .size()
+            .to_logical::<f32>(pixels_per_point.into());
+        Some(egui::vec2(size.width, size.height))
     } else {
         None
     };
@@ -57,6 +61,7 @@ pub fn read_window_info(
         fullscreen: window.fullscreen().is_some(),
         minimized: window_state.minimized,
         maximized: window_state.maximized,
+        focused: window.has_focus(),
         size: egui::Vec2 {
             x: size.width,
             y: size.height,
@@ -86,6 +91,7 @@ pub fn window_builder<E>(
         resizable,
         transparent,
         centered,
+        active,
         ..
     } = native_options;
 
@@ -99,6 +105,7 @@ pub fn window_builder<E>(
         .with_resizable(*resizable)
         .with_transparent(*transparent)
         .with_window_icon(window_icon)
+        .with_active(*active)
         // Keep hidden until we've painted something. See https://github.com/emilk/egui/pull/2279
         // We must also keep the window hidden until AccessKit is initialized.
         .with_visible(false);
@@ -109,6 +116,12 @@ pub fn window_builder<E>(
             .with_title_hidden(true)
             .with_titlebar_transparent(true)
             .with_fullsize_content_view(true);
+    }
+
+    #[cfg(all(feature = "wayland", target_os = "linux"))]
+    if let Some(app_id) = &native_options.app_id {
+        use winit::platform::wayland::WindowBuilderExtWayland as _;
+        window_builder = window_builder.with_name(app_id, "");
     }
 
     if let Some(min_size) = *min_window_size {
@@ -124,7 +137,7 @@ pub fn window_builder<E>(
         // Restore pos/size from previous session
         window_settings.clamp_to_sane_values(largest_monitor_point_size(event_loop));
         #[cfg(windows)]
-        window_settings.clamp_window_to_sane_position(&event_loop);
+        window_settings.clamp_window_to_sane_position(event_loop);
         window_builder = window_settings.initialize_window(window_builder);
         window_settings.inner_size_points()
     } else {
@@ -146,15 +159,12 @@ pub fn window_builder<E>(
 
     if *centered {
         if let Some(monitor) = event_loop.available_monitors().next() {
-            let monitor_size = monitor.size();
+            let monitor_size = monitor.size().to_logical::<f64>(monitor.scale_factor());
             let inner_size = inner_size_points.unwrap_or(egui::Vec2 { x: 800.0, y: 600.0 });
-            if monitor_size.width > 0 && monitor_size.height > 0 {
-                let x = (monitor_size.width - inner_size.x as u32) / 2;
-                let y = (monitor_size.height - inner_size.y as u32) / 2;
-                window_builder = window_builder.with_position(winit::dpi::LogicalPosition {
-                    x: x as f64,
-                    y: y as f64,
-                });
+            if monitor_size.width > 0.0 && monitor_size.height > 0.0 {
+                let x = (monitor_size.width - inner_size.x as f64) / 2.0;
+                let y = (monitor_size.height - inner_size.y as f64) / 2.0;
+                window_builder = window_builder.with_position(winit::dpi::LogicalPosition { x, y });
             }
         }
     }
@@ -227,8 +237,11 @@ pub fn handle_app_output(
         window_pos,
         visible: _, // handled in post_present
         always_on_top,
+        screenshot_requested: _, // handled by the rendering backend,
         minimized,
         maximized,
+        focus,
+        attention,
     } = app_output;
 
     if let Some(decorated) = decorated {
@@ -254,7 +267,7 @@ pub fn handle_app_output(
     }
 
     if let Some(window_pos) = window_pos {
-        window.set_outer_position(winit::dpi::PhysicalPosition {
+        window.set_outer_position(winit::dpi::LogicalPosition {
             x: window_pos.x as f64,
             y: window_pos.y as f64,
         });
@@ -282,6 +295,19 @@ pub fn handle_app_output(
         window.set_maximized(maximized);
         window_state.maximized = maximized;
     }
+
+    if !window.has_focus() {
+        if focus == Some(true) {
+            window.focus_window();
+        } else if let Some(attention) = attention {
+            use winit::window::UserAttentionType;
+            window.request_user_attention(match attention {
+                egui::UserAttentionType::Reset => None,
+                egui::UserAttentionType::Critical => Some(UserAttentionType::Critical),
+                egui::UserAttentionType::Informational => Some(UserAttentionType::Informational),
+            });
+        }
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -308,14 +334,19 @@ pub struct EpiIntegration {
     close: bool,
     can_drag_window: bool,
     window_state: WindowState,
+    follow_system_theme: bool,
+    app_icon_setter: super::app_icon::AppTitleIconSetter,
 }
 
 impl EpiIntegration {
+    #[allow(clippy::too_many_arguments)]
     pub fn new<E>(
         event_loop: &EventLoopWindowTarget<E>,
         max_texture_side: usize,
         window: &winit::window::Window,
         system_theme: Option<Theme>,
+        app_name: &str,
+        native_options: &crate::NativeOptions,
         storage: Option<Box<dyn epi::Storage>>,
         #[cfg(feature = "glow")] gl: Option<std::sync::Arc<glow::Context>>,
         #[cfg(feature = "wgpu")] wgpu_render_state: Option<egui_wgpu::RenderState>,
@@ -348,11 +379,17 @@ impl EpiIntegration {
             gl,
             #[cfg(feature = "wgpu")]
             wgpu_render_state,
+            screenshot: std::cell::Cell::new(None),
         };
 
         let mut egui_winit = egui_winit::State::new(event_loop);
         egui_winit.set_max_texture_side(max_texture_side);
         egui_winit.set_pixels_per_point(native_pixels_per_point);
+
+        let app_icon_setter = super::app_icon::AppTitleIconSetter::new(
+            app_name.to_owned(),
+            native_options.icon_data.clone(),
+        );
 
         Self {
             frame,
@@ -363,6 +400,8 @@ impl EpiIntegration {
             close: false,
             can_drag_window: false,
             window_state,
+            follow_system_theme: native_options.follow_system_theme,
+            app_icon_setter,
         }
     }
 
@@ -410,12 +449,12 @@ impl EpiIntegration {
 
         match event {
             WindowEvent::CloseRequested => {
-                tracing::debug!("Received WindowEvent::CloseRequested");
+                log::debug!("Received WindowEvent::CloseRequested");
                 self.close = app.on_close_event();
-                tracing::debug!("App::on_close_event returned {}", self.close);
+                log::debug!("App::on_close_event returned {}", self.close);
             }
             WindowEvent::Destroyed => {
-                tracing::debug!("Received WindowEvent::Destroyed");
+                log::debug!("Received WindowEvent::Destroyed");
                 self.close = true;
             }
             WindowEvent::MouseInput {
@@ -425,6 +464,11 @@ impl EpiIntegration {
             } => self.can_drag_window = true,
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
                 self.frame.info.native_pixels_per_point = Some(*scale_factor as _);
+            }
+            WindowEvent::ThemeChanged(winit_theme) if self.follow_system_theme => {
+                let theme = theme_from_winit_theme(*winit_theme);
+                self.frame.info.system_theme = Some(theme);
+                self.egui_ctx.set_visuals(theme.egui_visuals());
             }
             _ => {}
         }
@@ -443,6 +487,8 @@ impl EpiIntegration {
         window: &winit::window::Window,
     ) -> egui::FullOutput {
         let frame_start = std::time::Instant::now();
+
+        self.app_icon_setter.update();
 
         self.frame.info.window_info =
             read_window_info(window, self.egui_ctx.pixels_per_point(), &self.window_state);
@@ -463,9 +509,13 @@ impl EpiIntegration {
             self.can_drag_window = false;
             if app_output.close {
                 self.close = app.on_close_event();
-                tracing::debug!("App::on_close_event returned {}", self.close);
+                log::debug!("App::on_close_event returned {}", self.close);
             }
             self.frame.output.visible = app_output.visible; // this is handled by post_present
+            self.frame.output.screenshot_requested = app_output.screenshot_requested;
+            if self.frame.output.attention.is_some() {
+                self.frame.output.attention = None;
+            }
             handle_app_output(
                 window,
                 self.egui_ctx.pixels_per_point(),
@@ -503,7 +553,7 @@ impl EpiIntegration {
     }
 
     // ------------------------------------------------------------------------
-    // Persistance stuff:
+    // Persistence stuff:
 
     pub fn maybe_autosave(&mut self, app: &mut dyn epi::App, window: &winit::window::Window) {
         let now = std::time::Instant::now();
@@ -513,6 +563,7 @@ impl EpiIntegration {
         }
     }
 
+    #[allow(clippy::unused_self)]
     pub fn save(&mut self, _app: &mut dyn epi::App, _window: &winit::window::Window) {
         #[cfg(feature = "persistence")]
         if let Some(storage) = self.frame.storage_mut() {
@@ -564,4 +615,11 @@ pub fn load_egui_memory(_storage: Option<&dyn epi::Storage>) -> Option<egui::Mem
     }
     #[cfg(not(feature = "persistence"))]
     None
+}
+
+pub(crate) fn theme_from_winit_theme(theme: winit::window::Theme) -> Theme {
+    match theme {
+        winit::window::Theme::Dark => Theme::Dark,
+        winit::window::Theme::Light => Theme::Light,
+    }
 }
