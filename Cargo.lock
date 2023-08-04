@@ -940,7 +940,7 @@ dependencies = [
  "eframe",
  "egui_glow",
  "env_logger",
- "glow",
+ "glow 0.12.3",
 ]
 
 [[package]]
@@ -1174,7 +1174,7 @@ dependencies = [
  "egui-winit",
  "egui_glow",
  "gl",
- "glow",
+ "glow 0.12.3",
  "glutin",
  "glutin-winit",
  "image",
@@ -1307,7 +1307,7 @@ dependencies = [
  "document-features",
  "egui",
  "egui-winit",
- "glow",
+ "glow 0.12.3",
  "glutin",
  "glutin-winit",
  "log",
@@ -1731,6 +1731,17 @@ name = "glow"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e007a07a24de5ecae94160f141029e9a347282cfe25d1d58d85d845cf3130f1"
+dependencies = [
+ "js-sys",
+ "slotmap",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
+name = "glow"
+version = "0.12.3"
+source = "git+https://github.com/rustytsuki/glow?rev=afbc0d49#afbc0d49305d6fed7567703b4f1caefe4fd9a6bc"
 dependencies = [
  "js-sys",
  "slotmap",
@@ -3342,7 +3353,7 @@ dependencies = [
 [[package]]
 name = "skia-safe"
 version = "0.58.0"
-source = "git+https://github.com/rustytsuki/rust-skia?rev=1efe1a56#1efe1a5608bf7379cb3d2a74b738cc45aceddb52"
+source = "git+https://github.com/rustytsuki/rust-skia?rev=73f8f381#73f8f381505a9fb895e91142286d9bbd65f4886a"
 dependencies = [
  "bitflags 1.3.2",
  "lazy_static",
@@ -4315,7 +4326,7 @@ dependencies = [
  "core-graphics-types",
  "d3d12",
  "foreign-types",
- "glow",
+ "glow 0.12.1",
  "gpu-alloc",
  "gpu-allocator",
  "gpu-descriptor",

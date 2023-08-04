@@ -14,4 +14,4 @@ eframe = { path = "../../crates/eframe", features = [
 ] }
 egui_glow = { path = "../../crates/egui_glow" }
 env_logger = "0.10"
-glow = "0.12"
+glow = { git = "https://github.com/rustytsuki/glow", rev = "afbc0d49" }
