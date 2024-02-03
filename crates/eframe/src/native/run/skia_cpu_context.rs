@@ -26,7 +26,9 @@ impl SkiaCPUWindowContext {
     }
 
     pub fn resize(&mut self, physical_size: winit::dpi::PhysicalSize<u32>) {
-        self.surface = Self::create_surface(physical_size).unwrap();
+        if let Some(surface) = Self::create_surface(physical_size) {
+            self.surface = surface;
+        }
     }
 
     pub fn swap_buffers(&mut self) {
